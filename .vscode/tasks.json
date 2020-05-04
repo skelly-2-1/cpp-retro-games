@@ -1,0 +1,33 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558 
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+      {
+          "type": "shell",
+          "label": "make file",
+          "command": "bash",
+          "args": ["${workspaceFolder}/make.sh"],
+          "options": {
+              "cwd": "${workspaceFolder}"
+          },
+          "group": {
+              "kind": "build",
+              "isDefault": true
+          }
+      },
+      {
+          "type": "shell",
+          "label": "run",
+          "command": "bash",
+          "args": ["${workspaceFolder}/run.sh"],
+          "options": {
+              "cwd": "${workspaceFolder}"
+          },
+          "group": {
+              "kind": "test",
+              "isDefault": true
+          }
+      }
+  ]
+}
