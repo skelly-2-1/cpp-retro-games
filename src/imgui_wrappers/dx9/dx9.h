@@ -46,6 +46,10 @@ namespace retrogames
 
 		ImGuiStyle original_style;
 
+		ImVec4 original_style_colors[static_cast<uint8_t>(ImGuiCol_COUNT)];
+
+		bool original_style_colors_set;
+
 		internal::dx_imgui* imgui;
 
 		std::unique_ptr<window_t> window;

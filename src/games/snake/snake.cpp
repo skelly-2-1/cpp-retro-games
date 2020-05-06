@@ -523,8 +523,8 @@ void retrogames::games::snake_t::draw_pause_menu(void)
                 paused = false;
             }
 
-            if (ImGui::Button("Back to main menu", button_size)) pause_state = PAUSE_STATE::PAUSE_STATE_CONFIRM_MAIN_MENU;
-            if (ImGui::Button("Close game", button_size)) pause_state = PAUSE_STATE::PAUSE_STATE_CONFIRM_CLOSE_GAME;
+            if (ImGui::Button("Back to main menu", button_size)) pause_state = PAUSE_STATE::PAUSE_STATE_CONFIRM_CLOSE_GAME;//PAUSE_STATE::PAUSE_STATE_CONFIRM_MAIN_MENU;
+            //if (ImGui::Button("Close game", button_size)) pause_state = PAUSE_STATE::PAUSE_STATE_CONFIRM_CLOSE_GAME;
         }
         else
         {
@@ -723,6 +723,11 @@ void retrogames::games::snake_t::do_reset(void)
 
     // Didn't move yet
     move_counter = move_eat_counter = 0;
+
+    // Start the game immediately
+    game_state = GAME_STATE::GAME_STATE_PLAYING;
+    pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
+    paused = false;
 }
 
 /*
@@ -746,7 +751,7 @@ retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& nam
     move_eat_counter(0),
     resolution_area(settings->get_main_settings().resolution_area),
     setting_timeout(settings->create("snake_timeout", 3u)),
-    setting_field_size(settings->create("snake_field_size", 20u)),
+    setting_field_size(settings->create("snake_field_size", 10u)),
     setting_speed(settings->create("snake_speed", 10u)),
     snake_fps(static_cast<uint8_t>(setting_speed.get<uint32_t>())),
     fpsmanager(snake_fps),
@@ -774,6 +779,11 @@ retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& nam
     style.Colors[ImGuiCol_Button] = { 0.f, 0.f, 0.f, 0.f };
     style.Colors[ImGuiCol_ButtonActive] = { .8f, .8f, .8f, 1.f };
     style.Colors[ImGuiCol_ButtonHovered] = { .2f, .2f, .2f, 1.f };
+
+    // Start the game immediately
+    game_state = GAME_STATE::GAME_STATE_PLAYING;
+    pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
+    paused = false;
 }
 
 /*
@@ -1190,12 +1200,13 @@ void retrogames::games::snake_t::draw_death_menu(void)
 
             if (ImGui::Button("Back to main menu", button_size))
             {
-                game_state = GAME_STATE::GAME_STATE_MAIN_MENU;
+                //game_state = GAME_STATE::GAME_STATE_MAIN_MENU;
+                death_state = DEATH_STATE::DEATH_STATE_CONFIRM_CLOSE;
 
                 ImGui::CloseCurrentPopup();
             }
 
-            if (ImGui::Button("Close game", button_size)) death_state = DEATH_STATE::DEATH_STATE_CONFIRM_CLOSE;
+            //if (ImGui::Button("Close game", button_size)) death_state = DEATH_STATE::DEATH_STATE_CONFIRM_CLOSE;
         }
         else
         {

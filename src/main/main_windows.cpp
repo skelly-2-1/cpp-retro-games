@@ -189,9 +189,6 @@ void retrogames::main(void)
 						std::string("top: ") + std::to_string(monitorInfo.rcMonitor.top) + "\n" +
 						std::string("bottom: ") + std::to_string(monitorInfo.rcMonitor.bottom)).c_str(), "desktop resolution", 0);*/
 
-	// Change settings on ImGui that we want to change
-	ImGui::GetIO().IniFilename = nullptr; // Prevent ImGui from changing settings
-
 	// Tell our window that imgui has been initialized
 	imgui_initialized = true;
 

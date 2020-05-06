@@ -226,6 +226,7 @@ retrogames::imgui_wrapper_dx_t::imgui_wrapper_dx_t(settings_t* settings, const s
 	imgui_created(false),
 	render(true),
 	settings(settings),
+	original_style_colors_set(false),
 	imgui(new internal::dx_imgui()) {}
 
 /*
@@ -235,6 +236,13 @@ retrogames::imgui_wrapper_dx_t::imgui_wrapper_dx_t(settings_t* settings, const s
 */
 bool retrogames::imgui_wrapper_dx_t::reinitialize(std::string* error/* = nullptr*/)
 {
+	if (!original_style_colors_set)
+	{
+		original_style_colors_set = true;
+
+		memcpy(original_style_colors, ImGui::GetStyle().Colors, sizeof(original_style_colors));
+	}
+
 	shutdown();
 
 	imgui->release();
@@ -270,7 +278,9 @@ bool retrogames::imgui_wrapper_dx_t::reinitialize(std::string* error/* = nullptr
 
 	auto& style = ImGui::GetStyle();
 
-	memcpy(&style, &original_style, sizeof(ImGuiStyle));
+	style = original_style;
+
+	memcpy(style.Colors, original_style_colors, sizeof(original_style_colors));
 
 	style.ScaleAllSizes(static_cast<float>(window_size.height) / 1980.f);
 
@@ -405,6 +415,7 @@ bool retrogames::imgui_wrapper_dx_t::initialize(bool directx, std::string* error
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.IniFilename = nullptr; // Prevent ImGui from changing settings
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
