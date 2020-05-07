@@ -17,6 +17,7 @@
 #include "misc/color.h"
 #include "misc/area_size.h"
 #include "misc/settings.h"
+#include "imgui/imgui.h"
 
 struct GLFWwindow;
 
@@ -52,6 +53,13 @@ namespace retrogames
         area_size_t window_size;
 
         bool vsync, fullscreen;
+
+		ImGuiStyle original_style;
+
+		ImVec4 original_style_colors[static_cast<uint8_t>(ImGuiCol_COUNT)];
+
+		bool original_style_colors_set;
+
 
 	public:
 

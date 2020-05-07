@@ -291,11 +291,16 @@ GLFWwindow* retrogames::imgui_wrapper_glfw_t::get_glfw_window(void)
 */
 bool retrogames::imgui_wrapper_glfw_t::reinitialize(std::string* error/* = nullptr*/)
 {
+	if (!original_style_colors_set)
+	{
+		original_style_colors_set = true;
+
+		memcpy(original_style_colors, ImGui::GetStyle().Colors, sizeof(original_style_colors));
+	}
+
     // Shutdown everything needed
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
-
-    auto old_style = ImGui::GetStyle();
 
     ImGui::DestroyContext();
 
@@ -338,8 +343,13 @@ bool retrogames::imgui_wrapper_glfw_t::reinitialize(std::string* error/* = nullp
 	io.IniFilename = nullptr; // Prevent ImGui from changing settings
     io.DisplaySize = ImVec2{static_cast<float>(main_settings.resolution_area.width), static_cast<float>(main_settings.resolution_area.height)};
 
-    // Re-apply the old style
-    memcpy(&ImGui::GetStyle(), &old_style, sizeof(ImGuiStyle));
+	auto& style = ImGui::GetStyle();
+
+	style = original_style;
+
+	memcpy(style.Colors, original_style_colors, sizeof(original_style_colors));
+
+	style.ScaleAllSizes(static_cast<float>(window_size.height) / 1080.f);
 
     // Decide GL+GLSL versions
     // GL 3.0 + GLSL 130
@@ -421,6 +431,14 @@ bool retrogames::imgui_wrapper_glfw_t::initialize(bool glfw, std::string* error/
 
     // ImGui has been initialized successfully
 	imgui_created = true;
+
+    // Save the original style
+    auto& style = ImGui::GetStyle();
+
+    original_style = style;
+
+    // Scale the style by our resolution
+    style.ScaleAllSizes(static_cast<float>(window_size.height) / 1080.f);
 
 	// All done!
 	return true;
