@@ -242,7 +242,17 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
     static bool should_exit = false;
 
     // Viewing game options?
-    static bool viewing_options = false;
+    enum class start_game_e
+    {
+
+        START_GAME_STATE_MAIN,
+        START_GAME_STATE_OPTIONS,
+        START_GAME_STATE_CONTROLS,
+        START_GAME_STATE_INFORMATION
+
+    };
+
+    static start_game_e start_state = start_game_e::START_GAME_STATE_MAIN;
 
     // set up our left hand collection
     enum class selection_e
@@ -434,7 +444,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         {
             if (ImGui::Button(selection_names[i].c_str(), button_size))
             {
-                if (i == static_cast<uint8_t>(selection_e::selection_start)) viewing_options = false;
+                if (i == static_cast<uint8_t>(selection_e::selection_start)) start_state = start_game_e::START_GAME_STATE_MAIN;
 
                 selected_item = static_cast<selection_e>(i);
 
@@ -462,12 +472,14 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
 
-            if (!viewing_options)
+            if (start_state == start_game_e::START_GAME_STATE_MAIN)
             {
                 ImGui::TextWrapped("Here you can start the selected game or change settings.");
                 ImGui::Separator();
 
-                if (ImGui::Button("View options", button_size)) viewing_options = true;
+                if (ImGui::Button("Show information", button_size)) start_state = start_game_e::START_GAME_STATE_INFORMATION;
+                if (ImGui::Button("Show controls", button_size)) start_state = start_game_e::START_GAME_STATE_CONTROLS;
+                if (ImGui::Button("View options", button_size)) start_state = start_game_e::START_GAME_STATE_OPTIONS;
                 if (ImGui::Button("Play", button_size))
                 {
 #ifndef PLATFORM_NS
@@ -525,7 +537,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                     game_running = true;
                 }
             }
-            else
+            else if (start_state == start_game_e::START_GAME_STATE_OPTIONS)
             {
                 static auto window_bg_color = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
                 static auto frame_bg_color = ImVec4{window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier};
@@ -615,10 +627,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 }
 
                 ImGui::PopItemWidth();
-
-                auto cspos = ImGui::GetCursorScreenPos();
-
-                ImGui::SetCursorScreenPos({cspos.x, cspos.y+ImGui::GetFrameHeight()});
+                ImGuiUser::frame_height_spacing();
 #endif
 
                 ImGui::TextWrapped("Game options");
@@ -653,7 +662,31 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
                 ImGui::SetCursorScreenPos(screen_pos);
 
-                if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) viewing_options = false;
+                if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) start_state = start_game_e::START_GAME_STATE_MAIN;
+            }
+            else if (start_state == start_game_e::START_GAME_STATE_CONTROLS)
+            {
+                selected_game_menu->draw_controls(global_scaling);
+
+                auto screen_pos = ImGui::GetCursorScreenPos();
+
+                screen_pos.y += ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeight();
+
+                ImGui::SetCursorScreenPos(screen_pos);
+
+                if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) start_state = start_game_e::START_GAME_STATE_MAIN;
+            }
+            else
+            {
+                selected_game_menu->draw_information(global_scaling);
+
+                auto screen_pos = ImGui::GetCursorScreenPos();
+
+                screen_pos.y += ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeight();
+
+                ImGui::SetCursorScreenPos(screen_pos);
+
+                if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) start_state = start_game_e::START_GAME_STATE_MAIN;
             }
 
             ImGui::PopStyleVar();

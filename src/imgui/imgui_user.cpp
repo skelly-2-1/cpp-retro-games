@@ -116,3 +116,18 @@ void ImGuiUser::toggle_button(retrogames::cfgvalue_t* cfgvalue, const std::strin
         help_marker(desc);
     }
 }
+
+/*
+@brief
+
+    Adds a frame-height spacing
+*/
+void ImGuiUser::frame_height_spacing(uint8_t num/* = 1*/)
+{
+    for (uint8_t i = 0; i < num; i++)
+    {
+        auto cspos = ImGui::GetCursorScreenPos();
+
+        ImGui::SetCursorScreenPos({cspos.x, cspos.y+ImGui::GetFrameHeight()});
+    }
+}

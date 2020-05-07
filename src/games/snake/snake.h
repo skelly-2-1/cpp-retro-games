@@ -463,6 +463,20 @@ namespace retrogames
             */
             virtual void reset(settings_t* settings) override;
 
+            /*
+            @brief
+
+                Draws controls
+            */
+            virtual void draw_controls(float scaling) override;
+
+            /*
+            @brief
+
+                Draws some information
+            */
+            virtual void draw_information(float scaling) override;
+
         };
 
     }

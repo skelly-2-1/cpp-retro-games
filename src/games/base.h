@@ -106,6 +106,20 @@ namespace retrogames
         /*
         @brief
 
+            Draws controls
+        */
+        virtual void draw_controls(float scaling) = 0;
+
+        /*
+        @brief
+
+            Draws some information
+        */
+        virtual void draw_information(float scaling) = 0;
+
+        /*
+        @brief
+
             Returns the game information to the caller
         */
         const game_information_t& get_information(void) const { return game_info; }

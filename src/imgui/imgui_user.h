@@ -39,4 +39,11 @@ namespace ImGuiUser
     */
     void toggle_button(retrogames::cfgvalue_t* cfgvalue, const std::string& name, const std::string& desc = "");
 
+    /*
+    @brief
+
+        Adds a frame-height spacing
+    */
+    void frame_height_spacing(uint8_t num = 1);
+
 }
