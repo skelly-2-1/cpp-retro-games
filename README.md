@@ -22,10 +22,10 @@ Retro games made by Steven Kelly in C++. Supports Windows, Linux and the Nintend
 * Only 16:9 resolutions are supported at the moment. I'll look into changing that in the future.
 
 # Credits
-* ocornut - Dear ImGui
-* devkitpro/libnx - compiler toolchain/SDK for the Switch
-* RetroArch - Design inspiration
-* nlohmann - JSON library
+* ocornut - [Dear ImGui](https://github.com/ocornut/imgui "Link to library")
+* devkitpro/libnx - [compiler toolchain/SDK for the Switch](https://devkitpro.org/wiki/Getting_Started "Link to website")
+* [RetroArch](https://www.retroarch.com/ "Link to website") - Design inspiration
+* nlohmann - [JSON library](https://github.com/nlohmann/json "Link to library")
 * Microsoft - DirectX SDK (Windows backend) + Win32API
 * GLFW - Linux backend
 * Probably various other things I forgot - feel free to contact me though
