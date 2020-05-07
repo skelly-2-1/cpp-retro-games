@@ -13,11 +13,12 @@ Retro games made by Steven Kelly in C++. Supports Windows, Linux and the Nintend
 * GLFW and an OpenGL Loader required
 
 ## Nintendo Switch
-* devkitpro is required with installed Switch support. Also needs EGL, glad and gladpi libraries installed.
+* ONLY works on Switches with custom firmware installed
+* devkitpro is required with installed Switch support. Also needs EGL, glad and gladpi libraries installed
 
 # Notes
-* This is developed in Visual Studio Code. I've included my own .vscode directory, which may not work for you.
-* To change the target platform to build and test, change PLATFORM_X to PLATFORM_WINDOWS/LINUX/NS in .vscode/c_cpp_properties.json.
+* This is developed in Visual Studio Code. I've included my own .vscode directory, which may not work for you
+* To change the target platform to build and test, change PLATFORM_X to PLATFORM_WINDOWS/LINUX/NS in .vscode/c_cpp_properties.json
 
 # Credits
 * ocornut - Dear ImGui
@@ -27,3 +28,7 @@ Retro games made by Steven Kelly in C++. Supports Windows, Linux and the Nintend
 * Microsoft - DirectX SDK (Windows backend) + Win32API
 * GLFW - Linux backend
 * Probably various other things I forgot - feel free to contact me though
+
+# Images
+<img src="img/game-options.png">
+<img src="img/snake.png">
