@@ -19,6 +19,7 @@ Retro games made by Steven Kelly in C++. Supports Windows, Linux and the Nintend
 # Notes
 * This is developed in Visual Studio Code. I've included my own .vscode directory, which may not work for you
 * To change the target platform to build and test, change PLATFORM_X to PLATFORM_WINDOWS/LINUX/NS in .vscode/c_cpp_properties.json
+* Only 16:9 resolutions are supported at the moment. I'll look into changing that in the future.
 
 # Credits
 * ocornut - Dear ImGui
