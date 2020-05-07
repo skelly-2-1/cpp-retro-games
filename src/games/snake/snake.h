@@ -454,7 +454,7 @@ namespace retrogames
 
                 Draws the options menu
             */
-            virtual void draw_options(void) override;
+            virtual void draw_options(float scaling) override;
 
             /*
             @brief

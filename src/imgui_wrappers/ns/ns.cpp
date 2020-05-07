@@ -58,6 +58,10 @@ bool retrogames::imgui_wrapper_opengl_t::setup(std::string* error/* = nullptr*/)
 	imgui_sw::make_style_fast();
 #endif
 
+#if defined(PLATFORM_NS) && defined(NS_ENABLE_NXLINK)
+	TRACE("imgui displaysize: %ux%u", static_cast<uint32_t>(ImGui::GetIO().DisplaySize.x), static_cast<uint32_t>(ImGui::GetIO().DisplaySize.y));
+#endif
+
 	gl_created = true;
 
     return true;
@@ -218,9 +222,10 @@ void retrogames::imgui_wrapper_opengl_t::setup_io(void)
     auto& io = ImGui::GetIO();
 
     io.IniFilename = nullptr;
-    io.FontGlobalScale = 2.0;
     io.DisplaySize = ImVec2((float)FB_WIDTH, (float)FB_HEIGHT);
     io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+	ImGui::GetStyle().ScaleAllSizes(io.DisplaySize.y / 1080.f);
 }
 #endif

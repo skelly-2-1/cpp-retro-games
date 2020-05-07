@@ -1230,11 +1230,11 @@ void retrogames::games::snake_t::draw_death_menu(void)
 
     Draws the options menu
 */
-void retrogames::games::snake_t::draw_options(void)
+void retrogames::games::snake_t::draw_options(float scaling)
 {
-    ImGuiUser::inputslider_uint32_t(&setting_timeout, "Timeout (in seconds)", 10u, 0u, "How many seconds the game is in timeout when starting or tabbing back into the game.");
-    ImGuiUser::inputslider_uint32_t(&setting_field_size, "Resolution (X2)", 25u, 3u, "How many boxes are in one axis * 2 (x, y) * 2 = games' field resolution.");
-    ImGuiUser::inputslider_uint32_t(&setting_speed, "Speed", 60u, 1u, "How many times the snake moves from one box to another in a single second.");
+    ImGuiUser::inputslider_uint32_t(&setting_timeout, "Timeout (in seconds)", 10u, 0u, "How many seconds the game is in timeout when starting or tabbing back into the game.", scaling);
+    ImGuiUser::inputslider_uint32_t(&setting_field_size, "Resolution (X2)", 25u, 3u, "How many boxes are in one axis * 2 (x, y) * 2 = games' field resolution.", scaling);
+    ImGuiUser::inputslider_uint32_t(&setting_speed, "Speed", 60u, 1u, "How many times the snake moves from one box to another in a single second.", scaling);
 }
 
 /*

@@ -35,7 +35,7 @@ void ImGuiUser::help_marker(const std::string& desc)
 
     Draws a slider + input int given the range and description
 */
-void ImGuiUser::inputslider_uint32_t(retrogames::cfgvalue_t* cfgvalue, const std::string& name, uint32_t max, uint32_t min/* = 0u*/, const std::string& desc/* = ""*/)
+void ImGuiUser::inputslider_uint32_t(retrogames::cfgvalue_t* cfgvalue, const std::string& name, uint32_t max, uint32_t min/* = 0u*/, const std::string& desc/* = ""*/, float scaling/* = 1.f*/)
 {
     ImGui::Text("%s:", name.c_str());
 
@@ -48,7 +48,7 @@ void ImGuiUser::inputslider_uint32_t(retrogames::cfgvalue_t* cfgvalue, const std
 
     auto val = static_cast<int32_t>(cfgvalue->get<uint32_t>());
     auto avail_width = ImGui::GetContentRegionAvailWidth();
-    auto input_width = std::ceil(avail_width / 7.f);
+    auto input_width = std::ceil(avail_width / 7.f) * scaling;
 
     ImGui::PushItemWidth(input_width);
     ImGui::InputInt((std::string("##") + name).c_str(), &val);

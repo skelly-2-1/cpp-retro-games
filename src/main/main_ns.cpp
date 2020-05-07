@@ -20,6 +20,7 @@
 #include "misc/settings.h"
 #include "misc/macros.h"
 #include "misc/trace.h"
+#include "main/main.h"
 
 // NXLINK support
 #ifdef NS_ENABLE_NXLINK
@@ -58,15 +59,11 @@ extern "C" void userAppExit()
 }
 #endif
 
-// Needed for our settings
-std::unordered_map<std::string, retrogames::setting_t<uint8_t>*>* retrogames::detail::settings_list = new std::unordered_map<std::string, setting_t<uint8_t>*>;
-
 namespace retrogames
 {
 
     // Variables
 	std::unique_ptr<imgui_wrapper_opengl_t> imgui = nullptr;
-	std::unique_ptr<settings_t> settings = nullptr;
 
 	bool imgui_initialized = false;
 
@@ -127,17 +124,16 @@ void retrogames::show_error(const std::string& error)
 
 void retrogames::main(void)
 {
-    // Create and load our settings
-	// Destructor takes care of deleting the detail::settings_list.
-	auto settings = std::make_unique<retrogames::settings_t>("cpp-retro-games\\settings.json");
+	// Create and load our settings
+	settings_t settings("cpp-retro-games\\settings.json");
 
-	settings->load();
+	auto& main_settings = settings.get_main_settings();
 
 	// Create the config directory if it doesn't exist
 	mkdir("cpp-retro-games", 0777);
 
     // Initialize the imgui object
-	imgui = std::make_unique<imgui_wrapper_opengl_t>(settings.get());
+	imgui = std::make_unique<imgui_wrapper_opengl_t>(&settings);
 
     // Attempt to initialize OpenGL (or the software renderer)
 	std::string error;
@@ -147,14 +143,14 @@ void retrogames::main(void)
 	// Attempt to initialize ImGui
 	if (!imgui->initialize(false, &error)) return;
 
-    // Demo
-	bool show_demo_window = true;
-    bool show_another_window = false;
-
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
     // Grab the ImGui IO
     auto& io = ImGui::GetIO();
+
+    // initialize main functions
+	main_initialize(&settings);
+
+    // should we reset video settings? (dummy in this case)
+	bool reset_video_settings = false;
 
     // Begin our main application loop
 	while (appletMainLoop())
@@ -167,7 +163,7 @@ void retrogames::main(void)
 
         static auto old_keys = keys;
 
-        if (keys & KEY_PLUS) break;
+        //if (keys & KEY_PLUS) break;
 
 		// Map navigation inputs for ImGui (joystick input)
 		memset(io.NavInputs, 0, sizeof(io.NavInputs));
@@ -202,12 +198,12 @@ void retrogames::main(void)
                 if ((keys & key) && !(old_keys & key))
                 {
                     // pressed: mapped_key
-
+                    main_handle_key(true, mapped_key);
                 }
                 else if (!(keys & key) && (old_keys & key))
                 {
                     // released: mapped_key
-
+                    main_handle_key(false, mapped_key);
                 }
             };
 
@@ -249,54 +245,18 @@ void retrogames::main(void)
 		auto render = imgui->begin_frame();
 
 		// Draw
-		auto should_render = render/* && window->is_in_foreground()*/;
-		auto should_exit = /*snake->draw(should_render)*/false;
-
-		// Demo
-		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
+		auto should_exit = main_frame(true, reset_video_settings);
 
 		// End the frame
-		imgui->end_frame(/*should_render*/true, color_t(40, 40, 40));
+		imgui->end_frame(true, color_t(40, 40, 40));
 
 		// Exit if we should (if game::draw returns true)
-		//if (should_exit) break;
+		if (should_exit) break;
     }
 
     imgui->shutdown();
+
+    settings.save();
 }
 
 #endif

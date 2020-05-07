@@ -18,6 +18,10 @@
 
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
 #include "util/util.h"
+#else
+#ifdef NS_ENABLE_NXLINK
+#include "misc/trace.h"
+#endif
 #endif
 
 /*
@@ -27,6 +31,12 @@
 */
 void retrogames::mainmenu_t::initialize(settings_t* settings)
 {
+#ifdef PLATFORM_NS
+    global_scaling = 1.5f; // otherwise everything is too small on the tiny screen
+#else
+    global_scaling = 1.f;
+#endif
+
     // Save a pointer to the settings
     this->settings = settings;
 
@@ -54,13 +64,17 @@ void retrogames::mainmenu_t::create_fonts(void)
 
     ImFontConfig default_font_big_config;
 
-    default_font_big_config.SizePixels = std::ceil(static_cast<float>(settings->get_main_settings().resolution_area.height) / 25.f);
+    default_font_big_config.SizePixels = std::ceil(static_cast<float>(settings->get_main_settings().resolution_area.height) / 25.f) * global_scaling;
     default_font_big = io.Fonts->AddFontDefault(&default_font_big_config);
 
     ImFontConfig default_font_small_config;
 
     default_font_small_config.SizePixels = std::ceil(default_font_big_config.SizePixels * .5f);
     default_font_small = io.Fonts->AddFontDefault(&default_font_small_config);
+
+#if defined(PLATFORM_NS) && defined(NS_ENABLE_NXLINK)
+    TRACE("Resolution area: %ux%u, displaysize: %.0fx%.0f", settings->get_main_settings().resolution_area.width, settings->get_main_settings().resolution_area.height, io.DisplaySize.x, io.DisplaySize.y);
+#endif
 }
 
 /*
@@ -85,8 +99,6 @@ void retrogames::mainmenu_t::create_fonts(void)
 */
 bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 {
-    static bool run_game = false;
-
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
     // To check if any video settings changed
     struct video_settings_t final
@@ -142,13 +154,13 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
     static auto original_video_settings = video_settings_t(settings);
 
     // If a game is running, run that
-    static bool last_run_game = false;
+    static bool last_game_running = false;
 
-    bool should_run_game = run_game && selected_game != nullptr;
+    bool should_run_game = game_running && selected_game != nullptr;
 
-    if (last_run_game != should_run_game)
+    if (last_game_running != should_run_game)
     {
-        last_run_game = should_run_game;
+        last_game_running = should_run_game;
 
         if (!should_run_game)
         {
@@ -169,14 +181,14 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
     if (should_run_game)
     {
-        if (selected_game->draw(should_render)) run_game = false;
+        if (selected_game->draw(should_render)) game_running = false;
 
         return false;
     }
 #else
-    if (run_game && selected_game != nullptr)
+    if (game_running && selected_game != nullptr)
     {
-        if (selected_game->draw(should_render)) run_game = false;
+        if (selected_game->draw(should_render)) game_running = false;
 
         return false;
     }
@@ -277,9 +289,9 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
     auto& resolution_area = settings->get_main_settings().resolution_area;
     auto indent_multiplier_width = 70.f;
     auto indent_multiplier_height = 15.f;
-    auto indent_height = std::ceil(static_cast<float>(resolution_area.height) / indent_multiplier_height);
-    auto indent_width = std::ceil(static_cast<float>(resolution_area.height) / indent_multiplier_width);
-    auto left_selection_size_width = std::ceil(static_cast<float>(resolution_area.width) / 6.f);
+    auto indent_height = std::ceil(static_cast<float>(resolution_area.height) / indent_multiplier_height) * global_scaling;
+    auto indent_width = std::ceil(static_cast<float>(resolution_area.height) / indent_multiplier_width) * global_scaling;
+    auto left_selection_size_width = std::ceil(static_cast<float>(resolution_area.width) / 6.f) * global_scaling;
     auto selection_pos = ImVec2(indent_width, indent_height);
     auto selection_size = ImVec2(left_selection_size_width, static_cast<float>(resolution_area.height) - indent_height * 2.f);
 
@@ -414,7 +426,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
     ImGui::PushFont(default_font_big);
 
-    if (ImGui::Begin("##selection", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove))
+    if (ImGui::Begin("Menu selection", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove))
     {
         auto button_size = ImVec2(ImGui::GetWindowContentRegionWidth(), 0.f);
 
@@ -442,7 +454,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 
-    if (ImGui::Begin("##mainwindow", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove))
+    if (ImGui::Begin("Main window", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove))
     {
         if (selected_item == selection_e::selection_start)
         {
@@ -458,6 +470,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 if (ImGui::Button("View options", button_size)) viewing_options = true;
                 if (ImGui::Button("Play", button_size))
                 {
+#ifndef PLATFORM_NS
                     const auto& gamename = selected_game_menu->get_information().name;
 
                     video_settings_t game_video_settings(
@@ -507,22 +520,22 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                     selected_game->reset(settings);
 
                     settings->get_main_settings().resolution_area = old_resolution;
+#endif
 
-                    run_game = true;
+                    game_running = true;
                 }
             }
             else
             {
-#if defined(PLATFORM_LINUX) || defined(PLATFORM_WINDOWS)
-                ImGui::TextWrapped("Video options");
-                ImGui::Separator();
-
                 static auto window_bg_color = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
                 static auto frame_bg_color = ImVec4{window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier};
                 static auto text_selected_bg = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f};
                 static auto slidergrab_color = text_selected_bg;
                 static auto slidergrab_color_active = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f};
 
+#if defined(PLATFORM_LINUX) || defined(PLATFORM_WINDOWS)
+                ImGui::TextWrapped("Video options");
+                ImGui::Separator();
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
                 ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
@@ -540,7 +553,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                     &settings->get(gamename + "_video_resolution")
                 );
 
-                ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.");
+                ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
 
                 ImGui::PopStyleColor(6);
 
@@ -606,6 +619,8 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 auto cspos = ImGui::GetCursorScreenPos();
 
                 ImGui::SetCursorScreenPos({cspos.x, cspos.y+ImGui::GetFrameHeight()});
+#endif
+
                 ImGui::TextWrapped("Game options");
                 ImGui::Separator();
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
@@ -616,10 +631,21 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
                 ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
 
-                selected_game_menu->draw_options();
+#ifdef PLATFORM_NS
+                ImGui::PushStyleColor(ImGuiCol_Header, {1.f,1.f,1.f,0.f});
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
+#endif
 
+                selected_game_menu->draw_options(global_scaling);
+
+#ifndef PLATFORM_NS
                 ImGui::PopStyleVar(2);
                 ImGui::PopStyleColor(12);
+#else
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(9);
+#endif
 
                 auto screen_pos = ImGui::GetCursorScreenPos();
 
@@ -628,7 +654,6 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 ImGui::SetCursorScreenPos(screen_pos);
 
                 if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) viewing_options = false;
-#endif
             }
 
             ImGui::PopStyleVar();
@@ -685,7 +710,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
             ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
 
-            ImGuiUser::inputslider_uint32_t(settings->get_main_settings().fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.");
+            ImGuiUser::inputslider_uint32_t(settings->get_main_settings().fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
 
             ImGui::PopStyleColor(6);
 
@@ -859,5 +884,5 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 */
 void retrogames::mainmenu_t::handle_key(bool down, ImGuiKey key)
 {
-    if (selected_game != nullptr) selected_game->handle_key(key, down);
+    if (selected_game != nullptr && game_running) selected_game->handle_key(key, down);
 }

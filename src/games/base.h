@@ -101,7 +101,7 @@ namespace retrogames
 
             Draws the options menu
         */
-        virtual void draw_options(void) = 0;
+        virtual void draw_options(float scaling) = 0;
 
         /*
         @brief

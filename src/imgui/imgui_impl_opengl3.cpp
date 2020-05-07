@@ -67,6 +67,9 @@
 #include "imgui_impl_opengl3.h"
 
 #if (defined(PLATFORM_NS) && !defined(NS_IMGUI_SOFTWARE_RENDERING)) || defined(PLATFORM_LINUX)
+#if defined(PLATFORM_NS) && defined(NS_ENABLE_NXLINK)
+#include "misc/trace.h"
+#endif
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -207,6 +210,15 @@ bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
     // Desktop OpenGL 3/4 need a function loader. See the IMGUI_IMPL_OPENGL_LOADER_xxx explanation above.
     GLint current_texture;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &current_texture);
+
+#if defined(PLATFORM_NS) && defined(NS_ENABLE_NXLINK)
+    GLint dims[4] = {0};
+    glGetIntegerv(GL_VIEWPORT, dims);
+    GLint fbWidth = dims[2];
+    GLint fbHeight = dims[3];
+
+    TRACE("GL framebuffer size: %ix%i", fbWidth, fbHeight);
+#endif
 
     return true;
 }

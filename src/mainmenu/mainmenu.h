@@ -38,6 +38,10 @@ namespace retrogames
 
         settings_t* settings;
 
+        bool game_running;
+
+        float global_scaling;
+
     public:
 
         /*
@@ -52,7 +56,7 @@ namespace retrogames
 
             Constructor
         */
-        mainmenu_t() : selected_game(nullptr), games_manager(nullptr) {}
+        mainmenu_t() : selected_game(nullptr), games_manager(nullptr), game_running(false), global_scaling(1.f) {}
 
         /*
         @brief

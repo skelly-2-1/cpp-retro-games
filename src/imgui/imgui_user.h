@@ -30,7 +30,7 @@ namespace ImGuiUser
 
         Draws a slider + input int given the range and description
     */
-    void inputslider_uint32_t(retrogames::cfgvalue_t* cfgvalue, const std::string& name, uint32_t max, uint32_t min = 0u, const std::string& desc = "");
+    void inputslider_uint32_t(retrogames::cfgvalue_t* cfgvalue, const std::string& name, uint32_t max, uint32_t min = 0u, const std::string& desc = "", float scaling = 1.f);
 
     /*
     @brief

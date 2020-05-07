@@ -22,6 +22,13 @@
 #include "macros.h"
 #include "area_size.h"
 
+#ifdef PLATFORM_NS
+#include <switch.h>
+#ifdef NS_ENABLE_NXLINK
+#include "misc/trace.h"
+#endif
+#endif
+
 #ifdef SETTINGS_ENABLE_DEBUGGING
 #ifdef PLATFORM_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
@@ -59,6 +66,8 @@ namespace retrogames
 		cfgvalue_t* fps;
 
 		area_size_t resolution_area;
+#else
+		area_size_t resolution_area;
 #endif
 
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
@@ -69,6 +78,8 @@ namespace retrogames
 			fps(nullptr),
 			resolution_area(area_size_t(1280, 720))
 			{}
+#else
+		main_settings_t() {}
 #endif
 
 	};
@@ -131,6 +142,7 @@ namespace retrogames
 			catch (...) {}
 #endif
 
+#ifndef PLATFORM_NS
 			main_settings.vsync = &create("main_vsync", false);
 			main_settings.fullscreen = &create("main_fullscreen", false);
 			main_settings.resolution = &create("main_resolution", "1280x720");
@@ -146,6 +158,12 @@ namespace retrogames
 					main_settings.resolution_area.height = std::stoi(res.substr(pos + 1));
 				}
 			}
+#else
+			main_settings.resolution_area = area_size_t(static_cast<uint32_t>(FB_WIDTH), static_cast<uint32_t>(FB_HEIGHT));
+#if defined(PLATFORM_NS) && defined(NS_ENABLE_NXLINK)
+			TRACE("resolution area: %ux%u. 720p: %ux%u", main_settings.resolution_area.width, main_settings.resolution_area.height, 1280u, 720u);
+#endif
+#endif
 		}
 
 		/*

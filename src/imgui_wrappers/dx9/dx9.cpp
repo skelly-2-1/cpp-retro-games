@@ -282,7 +282,7 @@ bool retrogames::imgui_wrapper_dx_t::reinitialize(std::string* error/* = nullptr
 
 	memcpy(style.Colors, original_style_colors, sizeof(original_style_colors));
 
-	style.ScaleAllSizes(static_cast<float>(window_size.height) / 1980.f);
+	style.ScaleAllSizes(static_cast<float>(window_size.height) / 1080.f);
 
 	return true;
 }
@@ -426,7 +426,7 @@ bool retrogames::imgui_wrapper_dx_t::initialize(bool directx, std::string* error
 
 	original_style = style;
 
-	style.ScaleAllSizes(static_cast<float>(window_size.height) / 1980.f);
+	style.ScaleAllSizes(static_cast<float>(window_size.height) / 1080.f);
 
 	// Setup Platform/Renderer bindings
 	if (!ImGui_ImplWin32_Init(window->get_handle()))

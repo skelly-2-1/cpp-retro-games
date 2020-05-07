@@ -10,7 +10,7 @@
 
 #ifdef PLATFORM_WINDOWS
 #include <Windows.h>
-#else
+#elif defined(PLATFORM_LINUX)
 #include <GLFW/glfw3.h>
 #endif
 
