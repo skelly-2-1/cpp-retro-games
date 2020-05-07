@@ -13,7 +13,7 @@
           "C:/mingw-w64/x86_64-8.1.0-posix-seh-rt_v6-rev0/mingw64/lib/gcc/x86_64-w64-mingw32/8.1.0/include/**"
         ],
         "intelliSenseMode": "gcc-x64",
-        "defines": ["PLATFORM_LINUX"]
+        "defines": ["PLATFORM_WINDOWS"]
       }
     ],
     "version": 4
