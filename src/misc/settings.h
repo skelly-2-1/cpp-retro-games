@@ -64,23 +64,22 @@ namespace retrogames
 		cfgvalue_t* fullscreen;
 		cfgvalue_t* resolution;
 		cfgvalue_t* fps;
-
-		area_size_t resolution_area;
-#else
-		area_size_t resolution_area;
 #endif
 
+		area_size_t resolution_area;
+
+		cfgvalue_t* draw_fps, *draw_frametime, *draw_playtime, *draw_position, *timeout_time;
+
+		main_settings_t()
+		{
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
-		main_settings_t() : 
-			vsync(nullptr),
-			fullscreen(nullptr),
-			resolution(nullptr),
-			fps(nullptr),
-			resolution_area(area_size_t(1280, 720))
-			{}
-#else
-		main_settings_t() {}
+			vsync = fullscreen = resolution = fps = nullptr;
 #endif
+
+			resolution_area = area_size_t(1280, 720);
+
+			draw_fps = draw_frametime = draw_playtime = draw_position = timeout_time = nullptr;
+		}
 
 	};
 
@@ -164,6 +163,12 @@ namespace retrogames
 			TRACE("resolution area: %ux%u. 720p: %ux%u", main_settings.resolution_area.width, main_settings.resolution_area.height, 1280u, 720u);
 #endif
 #endif
+
+			main_settings.draw_fps = &create("main_draw_fps", true);
+			main_settings.draw_frametime = &create("main_draw_frametime", true);
+			main_settings.draw_playtime = &create("main_draw_playtime", true);
+			main_settings.draw_position = &create("main_draw_position_alignment", "topright");
+			main_settings.timeout_time = &create("main_lostfocus_timeout_time", 3u);
 		}
 
 		/*

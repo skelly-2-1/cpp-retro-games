@@ -131,3 +131,54 @@ void ImGuiUser::frame_height_spacing(uint8_t num/* = 1*/)
         ImGui::SetCursorScreenPos({cspos.x, cspos.y+ImGui::GetFrameHeight()});
     }
 }
+
+/*
+@brief
+
+    Converts a color_t to an ImGui color (ImVec4)
+*/
+ImVec4 ImGuiUser::color_to_imgui_color_vec4(const retrogames::color_t& color)
+{
+    return ImVec4{static_cast<float>(color.r()) / 255.f, static_cast<float>(color.g()) / 255.f, static_cast<float>(color.b()) / 255.f, static_cast<float>(color.a()) / 255.f};
+}
+
+/*
+@brief
+
+    Converts a color_t to an ImGui color (u32)
+*/
+ImU32 ImGuiUser::color_to_imgui_color_u32(const retrogames::color_t& color)
+{
+    return ImGui::GetColorU32(color_to_imgui_color_vec4(color));
+}
+
+/*
+@brief
+
+    Draws information on the screen
+*/
+void ImGuiUser::draw_info(const ImVec2& pos, std::string info)
+{
+    auto border_color = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+    auto text_color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    auto background_color = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+    auto size = ImVec2{ImGui::CalcTextSize(info.c_str()).x + ImGui::GetStyle().FramePadding.x * 2.f + ImGui::GetStyle().ItemSpacing.x,ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y * 2.f};
+    auto pos_ = ImVec2{pos.x - size.x * .5f, pos.y - size.y * .5f};
+
+    ImGui::SetNextWindowPos(pos_, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, background_color);
+    ImGui::PushStyleColor(ImGuiCol_Text, text_color);
+    ImGui::PushStyleColor(ImGuiCol_Border, border_color);
+
+    if (ImGui::Begin("##notification", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoInputs))
+    {
+        ImGui::TextUnformatted(info.c_str());
+        ImGui::End();
+    }
+
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(2);
+}

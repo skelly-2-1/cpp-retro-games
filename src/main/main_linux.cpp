@@ -52,6 +52,38 @@ namespace retrogames
 	/*
 	@brief
 
+		Turns a glfw key to an ImGuiKey
+	*/
+	static auto to_imgui_key = [](int key) -> ImGuiKey
+	{
+		static bool reverse_keymap_init = true;
+		static std::unordered_map<int, ImGuiKey> reverse_keymap;
+
+		if (reverse_keymap_init)
+		{
+			reverse_keymap_init = false;
+
+			auto& io = ImGui::GetIO();
+
+			for (uint8_t i = 0; i < static_cast<uint8_t>(ImGuiKey_COUNT); i++)
+			{
+				auto key = static_cast<ImGuiKey>(i);
+				auto raw_key = io.KeyMap[i];
+
+				reverse_keymap[raw_key] = key;
+			}
+		}
+
+		if (reverse_keymap.empty()) return ImGuiKey_COUNT;
+
+		auto f = reverse_keymap.find(static_cast<int>(key));
+
+		return f != reverse_keymap.end() ? f->second : ImGuiKey_COUNT;
+	};
+
+	/*
+	@brief
+
 		Handles GLFW key functions
 	*/
 	GLFWkeyfun previous_key_callback = nullptr;
@@ -60,33 +92,6 @@ namespace retrogames
 	{
 		if (previous_key_callback != nullptr) previous_key_callback(window, key, scancode, action, mods);
 		if (action != GLFW_PRESS && action != GLFW_RELEASE) return;
-
-		static auto to_imgui_key = [&key]() -> ImGuiKey
-		{
-			static bool reverse_keymap_init = true;
-			static std::unordered_map<int, ImGuiKey> reverse_keymap;
-
-			if (reverse_keymap_init)
-			{
-				reverse_keymap_init = false;
-
-				auto& io = ImGui::GetIO();
-
-				for (uint8_t i = 0; i < static_cast<uint8_t>(ImGuiKey_COUNT); i++)
-				{
-					auto key = static_cast<ImGuiKey>(i);
-					auto raw_key = io.KeyMap[i];
-
-					reverse_keymap[raw_key] = key;
-				}
-			}
-
-			if (reverse_keymap.empty()) return ImGuiKey_COUNT;
-
-			auto f = reverse_keymap.find(static_cast<int>(key));
-
-			return f != reverse_keymap.end() ? f->second : ImGuiKey_COUNT;
-		};
 
 		auto found_key = to_imgui_key();
 

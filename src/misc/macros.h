@@ -32,4 +32,10 @@
 // NOTE: Don't change for now, doesn't seem to want to change in EGL/OpenGL mode
 #define FB_WIDTH  1280
 #define FB_HEIGHT 720
+
+// The UI will be scaled by this multiplier on the Nintendo Switch
+#define UI_SCALE 1.5f
+#else
+// The UI will be scaled by this multiplier on Windows and Linux
+#define UI_SCALE 1.f
 #endif

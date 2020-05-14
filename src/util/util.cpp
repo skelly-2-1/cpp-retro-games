@@ -160,6 +160,6 @@ const std::pair<std::vector<std::tuple<uint16_t, uint16_t, uint16_t>>, std::stri
 bool retrogames::util::check_aspect_ratio(const area_size_t& size, const uint8_t aspect_x/* = 16*/, const uint8_t aspect_y/* = 9*/)
 {
     return  std::round(static_cast<double>(size.width) / static_cast<double>(get_aspect_remainder(size.width, size.height))) == static_cast<double>(aspect_x) &&
-             std::round(static_cast<double>(size.height) / static_cast<double>(get_aspect_remainder(size.width, size.height))) == static_cast<double>(aspect_y);
+            std::round(static_cast<double>(size.height) / static_cast<double>(get_aspect_remainder(size.width, size.height))) == static_cast<double>(aspect_y);
 }
 #endif

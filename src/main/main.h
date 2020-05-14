@@ -39,6 +39,7 @@ namespace retrogames
         @reset_video_mode:  Returns information to the caller if
                             the video mode should be reset
                             (when we changed settings)
+                            
     @return
 
         True if the application should exit, false if not

@@ -14,6 +14,7 @@
 #include <string>
 #include <cstdint>
 #include "misc/cfgvalue.h"
+#include "misc/color.h"
 
 namespace ImGuiUser
 {
@@ -45,5 +46,26 @@ namespace ImGuiUser
         Adds a frame-height spacing
     */
     void frame_height_spacing(uint8_t num = 1);
+
+    /*
+    @brief
+
+        Converts a color_t to an ImGui color (ImVec4)
+    */
+    ImVec4 color_to_imgui_color_vec4(const retrogames::color_t& color);
+    
+     /*
+    @brief
+
+        Converts a color_t to an ImGui color (u32)
+    */
+    ImU32 color_to_imgui_color_u32(const retrogames::color_t& color);
+
+    /*
+    @brief
+
+        Draws information on the screen
+    */
+    void draw_info(const ImVec2& pos, std::string info);
 
 }

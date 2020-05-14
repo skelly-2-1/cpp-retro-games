@@ -47,6 +47,7 @@ void retrogames::main_initialize(settings_t* settings)
     @reset_video_mode:  Returns information to the caller if
                         the video mode should be reset
                         (when we changed settings)
+
 @return
 
     True if the application should exit, false if not
@@ -73,5 +74,5 @@ void retrogames::main_handle_key(bool down, ImGuiKey key)
 */
 void retrogames::main_reset(void)
 {
-    mainmenu.create_fonts();
+    mainmenu.reset();
 }

@@ -12,17 +12,23 @@
 #include <stdio.h>
 #include "mainmenu.h"
 #include "imgui/imgui.h"
-#include "games/snake/snake.h"
 #include "misc/macros.h"
 #include "imgui/imgui_user.h"
 
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
 #include "util/util.h"
+/*#ifdef PLATFORM_WINDOWS
+#include <Windows.h>
+#endif*/
 #else
 #ifdef NS_ENABLE_NXLINK
 #include "misc/trace.h"
 #endif
 #endif
+
+// games
+#include "games/snake/snake.h"
+#include "games/pingpong/pingpong.h"
 
 /*
 @brief
@@ -31,11 +37,7 @@
 */
 void retrogames::mainmenu_t::initialize(settings_t* settings)
 {
-#ifdef PLATFORM_NS
-    global_scaling = 1.5f; // otherwise everything is too small on the tiny screen
-#else
-    global_scaling = 1.f;
-#endif
+    global_scaling = UI_SCALE;
 
     // Save a pointer to the settings
     this->settings = settings;
@@ -44,11 +46,12 @@ void retrogames::mainmenu_t::initialize(settings_t* settings)
     create_fonts();
 
     // Create the games manager
-    games_manager = std::make_unique<games_manager_t>(settings);
+    games_manager = std::make_unique<games_manager_t>(settings, &default_font_small, &default_font_mid, &default_font_big);
 
     // Here we add our games. Each game can have a pointer to it's icon,
     // version numbering, and name.
     games_manager->add_game<games::snake_t>("snake");
+    games_manager->add_game<games::pingpong_t>("pingpong");
 
     selected_game = games_manager->select_game("snake");
 }
@@ -72,9 +75,31 @@ void retrogames::mainmenu_t::create_fonts(void)
     default_font_small_config.SizePixels = std::ceil(default_font_big_config.SizePixels * .5f);
     default_font_small = io.Fonts->AddFontDefault(&default_font_small_config);
 
+    ImFontConfig default_font_mid_config;
+
+    default_font_mid_config.SizePixels = std::ceil(default_font_big_config.SizePixels * .75f);
+    default_font_mid = io.Fonts->AddFontDefault(&default_font_mid_config);
+
 #if defined(PLATFORM_NS) && defined(NS_ENABLE_NXLINK)
     TRACE("Resolution area: %ux%u, displaysize: %.0fx%.0f", settings->get_main_settings().resolution_area.width, settings->get_main_settings().resolution_area.height, io.DisplaySize.x, io.DisplaySize.y);
 #endif
+}
+
+/*
+@brief
+
+    Called on reset
+*/
+void retrogames::mainmenu_t::reset(void)
+{
+    create_fonts();
+
+    if (reset_game)
+    {
+        games_manager->get_current_game()->base_reset(settings, true);
+
+        reset_game = false;
+    }
 }
 
 /*
@@ -110,21 +135,51 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
         std::string resolution;
 
+        bool draw_fps, draw_frametime, draw_playtime;
+
+        std::string draw_position;
+
+        uint32_t timeout_time;
+
         cfgvalue_t* cfgvalue_fps, *cfgvalue_vsync, *cfgvalue_fullscreen, *cfgvalue_resolution;
+        cfgvalue_t* cfgvalue_draw_fps, *cfgvalue_draw_frametime, *cfgvalue_draw_playtime, *cfgvalue_draw_position, *cfgvalue_timeout_time;
+
+        void load_from_cfgvalues(void)
+        {
+            fps = cfgvalue_fps->get<uint32_t>();
+            vsync = cfgvalue_vsync->get<bool>();
+            fullscreen = cfgvalue_fullscreen->get<bool>();
+            resolution = cfgvalue_resolution->get<std::string>();
+            draw_fps = cfgvalue_draw_fps->get<bool>();
+            draw_frametime = cfgvalue_draw_frametime->get<bool>();
+            draw_playtime = cfgvalue_draw_playtime->get<bool>();
+            draw_position = cfgvalue_draw_position->get<std::string>();
+            timeout_time = cfgvalue_timeout_time->get<uint32_t>();
+        }
 
         video_settings_t(settings_t* settings) :
             cfgvalue_fps(nullptr),
             cfgvalue_vsync(nullptr),
             cfgvalue_fullscreen(nullptr),
-            cfgvalue_resolution(nullptr)
+            cfgvalue_resolution(nullptr),
+            cfgvalue_draw_fps(nullptr),
+            cfgvalue_draw_frametime(nullptr),
+            cfgvalue_draw_playtime(nullptr),
+            cfgvalue_draw_position(nullptr),
+            cfgvalue_timeout_time(nullptr)
         {
             fps = settings->get_main_settings().fps->get<uint32_t>();
             vsync = settings->get_main_settings().vsync->get<bool>();
             fullscreen = settings->get_main_settings().fullscreen->get<bool>();
             resolution = settings->get_main_settings().resolution->get<std::string>();
+            draw_fps = settings->get_main_settings().draw_fps->get<bool>();
+            draw_frametime = settings->get_main_settings().draw_frametime->get<bool>();
+            draw_playtime = settings->get_main_settings().draw_playtime->get<bool>();
+            draw_position = settings->get_main_settings().draw_position->get<std::string>();
+            timeout_time = settings->get_main_settings().timeout_time->get<uint32_t>();
         }
 
-        video_settings_t(uint32_t fps, bool vsync, bool fullscreen, std::string resolution) :
+        video_settings_t(uint32_t fps, bool vsync, bool fullscreen, std::string resolution, bool draw_fps, bool draw_frametime, bool draw_playtime, std::string draw_position, uint32_t timeout_time) :
             cfgvalue_fps(nullptr),
             cfgvalue_vsync(nullptr),
             cfgvalue_fullscreen(nullptr),
@@ -132,17 +187,26 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             fps(fps),
             vsync(vsync),
             fullscreen(fullscreen),
-            resolution(resolution) {}
+            resolution(resolution),
+            draw_fps(draw_fps),
+            draw_frametime(draw_frametime),
+            draw_playtime(draw_playtime),
+            draw_position(draw_position),
+            timeout_time(timeout_time) {}
 
-        video_settings_t(cfgvalue_t* fps, cfgvalue_t* vsync, cfgvalue_t* fullscreen, cfgvalue_t* resolution) :
+        video_settings_t(cfgvalue_t* fps, cfgvalue_t* vsync, cfgvalue_t* fullscreen, cfgvalue_t* resolution, cfgvalue_t* cfgvalue_draw_fps, cfgvalue_t* cfgvalue_draw_frametime, cfgvalue_t* cfgvalue_draw_playtime, cfgvalue_t* cfgvalue_draw_position, cfgvalue_t* cfgvalue_timeout_time) :
             cfgvalue_fps(fps),
             cfgvalue_vsync(vsync),
             cfgvalue_fullscreen(fullscreen),
             cfgvalue_resolution(resolution),
-            fps(fps->get<uint32_t>()),
-            vsync(vsync->get<bool>()),
-            fullscreen(fullscreen->get<bool>()),
-            resolution(resolution->get<std::string>()) {}
+            cfgvalue_draw_fps(cfgvalue_draw_fps),
+            cfgvalue_draw_frametime(cfgvalue_draw_frametime),
+            cfgvalue_draw_playtime(cfgvalue_draw_playtime),
+            cfgvalue_draw_position(cfgvalue_draw_position),
+            cfgvalue_timeout_time(cfgvalue_timeout_time)
+        {
+            load_from_cfgvalues();
+        }
 
         bool differs(const video_settings_t& other)
         {
@@ -155,6 +219,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
     // If a game is running, run that
     static bool last_game_running = false;
+    static bool main_reset_video_settings = false;
 
     bool should_run_game = game_running && selected_game != nullptr;
 
@@ -165,12 +230,18 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         if (!should_run_game)
         {
             // Reset video mode to original
-            reset_video_mode = true;
+            if (main_reset_video_settings)
+            {
+                reset_video_mode = true;
+                main_reset_video_settings = false;
+            }
 
             return false;
         }
         else
         {
+            main_reset_video_settings = video_settings_t(settings).differs(original_video_settings);
+
             // Set the global video settings back to the default
             settings->get_main_settings().fps->set(original_video_settings.fps);
             settings->get_main_settings().fullscreen->set(original_video_settings.fullscreen);
@@ -181,14 +252,24 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
     if (should_run_game)
     {
-        if (selected_game->draw(should_render)) game_running = false;
+        ImGui::PushFont(default_font_big);
+
+        if (selected_game->base_draw(should_render)) game_running = false;
+        if (selected_game->is_paused() && should_render && selected_game->draw_pause_menu(default_font_big)) game_running = false;
+
+        ImGui::PopFont();
 
         return false;
     }
 #else
     if (game_running && selected_game != nullptr)
     {
-        if (selected_game->draw(should_render)) game_running = false;
+        ImGui::PushFont(default_font_big);
+
+        if (selected_game->base_draw(should_render)) game_running = false;
+        if (selected_game->is_paused() && selected_game->draw_pause_menu(default_font_big)) game_running = false;
+
+        ImGui::PopFont();
 
         return false;
     }
@@ -414,11 +495,6 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         ImGui::PopFont();
     };
 
-    static auto color_to_imgui_color = [](const color_t& color)
-    {
-        return ImGui::GetColorU32({static_cast<float>(color.r()) / 255.f, static_cast<float>(color.g()) / 255.f, static_cast<float>(color.b()) / 255.f, static_cast<float>(color.a()) / 255.f});
-    };
-
     static bool focus_set = false;
 
     if (!focus_set)
@@ -428,10 +504,12 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         focus_set = true;
     }
 
+    auto main_window_bg_color = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * window_dampening_multiplier, (static_cast<float>(background_color.g()) / 255.f) * window_dampening_multiplier, (static_cast<float>(background_color.b()) / 255.f) * window_dampening_multiplier, 1.f};
+
     ImGui::SetNextWindowPos(selection_pos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(selection_size, ImGuiCond_Always);
-    ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0.f, 0.f), ImVec2(static_cast<float>(resolution_area.width), static_cast<float>(resolution_area.height)), color_to_imgui_color(background_color));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, {(static_cast<float>(background_color.r()) / 255.f) * window_dampening_multiplier, (static_cast<float>(background_color.g()) / 255.f) * window_dampening_multiplier, (static_cast<float>(background_color.b()) / 255.f) * window_dampening_multiplier, 1.f});
+    ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0.f, 0.f), ImVec2(static_cast<float>(resolution_area.width), static_cast<float>(resolution_area.height)), ImGuiUser::color_to_imgui_color_u32(background_color));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, main_window_bg_color);
     ImGui::PushStyleColor(ImGuiCol_Border, {0.f,0.f,0.f,0.f});
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
     ImGui::PushFont(default_font_big);
@@ -457,98 +535,409 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         ImGui::End();
     }
 
-    ImGui::SetNextWindowPos(ImVec2(indent_width + selection_size.x, selection_pos.y), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2((static_cast<float>(resolution_area.width) - indent_width * 2.f) - selection_size.x, selection_size.y), ImGuiCond_Always);
+    static std::string subwindow_button_text, subwindow_button_text_2;
+    static bool subwindow_button_pressed = false, subwindow_button_pressed_2 = false;
+
+    auto window_y_offset = ImGui::GetStyle().ItemSpacing.y;//0.f;//ImGui::GetStyle().WindowPadding.y*2.f+ImGui::GetStyle().ItemSpacing.y;
+    auto main_window_pos = ImVec2(indent_width + selection_size.x, selection_pos.y+1.f);
+    auto main_window_size = ImVec2((static_cast<float>(resolution_area.width) - indent_width * 2.f) - selection_size.x, selection_size.y - 2.f);
+    auto draw_bottom_button = (selected_item == selection_e::selection_start && start_state != start_game_e::START_GAME_STATE_MAIN) || selected_item == selection_e::selection_options;
+
+    if (draw_bottom_button)
+    {
+        // Make room for another window at the bottom, which will contain the bottom button
+        //main_window_size.y -= (ImGui::GetFrameHeightWithSpacing() + window_y_offset) + ImGui::GetStyle().WindowPadding.y;
+
+        //ImGui::GetBackgroundDrawList()->AddRectFilled({main_window_pos.x,main_window_pos.y+main_window_size.y}, ImVec2{main_window_pos.x+main_window_size.x,main_window_pos.y+main_window_size.y+ImGui::GetStyle().WindowPadding.y+1.f}, ImGui::GetColorU32(main_window_bg_color));
+
+        if (selected_item == selection_e::selection_options)
+        {
+            subwindow_button_text = "Apply";
+            subwindow_button_text_2.clear();
+        }
+        else if (start_state == start_game_e::START_GAME_STATE_CONTROLS || start_state == start_game_e::START_GAME_STATE_INFORMATION)
+        {
+            subwindow_button_text = "Back";
+            subwindow_button_text_2.clear();
+        }
+        else
+        {
+            subwindow_button_text = "Back";
+            subwindow_button_text_2 = "Apply defaults";
+        }
+    }
+    else if (!subwindow_button_text.empty())
+    {
+        subwindow_button_text.clear();
+    }
+
+    ImGui::SetNextWindowPos(main_window_pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(main_window_size, ImGuiCond_Always);
     ImGui::PushStyleColor(ImGuiCol_Border,{1.f,1.f,1.f,1.f});
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 
+    static bool load_align_combo = false;
+    static bool load_resolution = false;
+
     if (ImGui::Begin("Main window", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove))
     {
-        if (selected_item == selection_e::selection_start)
+        if (draw_bottom_button)
         {
-            auto button_size = ImVec2{ImGui::GetContentRegionAvailWidth(),0.f};
+            ImGui::PushStyleColor(ImGuiCol_WindowBg,{0.f,0.f,0.f,0.f});
+            ImGui::SetNextWindowPos({main_window_pos.x+ImGui::GetStyle().WindowPadding.x,main_window_pos.y+ImGui::GetStyle().WindowPadding.y}, ImGuiCond_Always);
+        }
 
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
-
-            if (start_state == start_game_e::START_GAME_STATE_MAIN)
+        if (!draw_bottom_button || ImGui::BeginChild("Main child window #1", ImVec2(main_window_size.x-ImGui::GetStyle().WindowPadding.x*2.f, (main_window_size.y-((ImGui::GetFrameHeightWithSpacing() + window_y_offset) + ImGui::GetStyle().WindowPadding.y))-ImGui::GetStyle().WindowPadding.y*2.f), false, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove/* | ImGuiWindowFlags_NoNav*/))
+        {
+            if (selected_item == selection_e::selection_start)
             {
-                ImGui::TextWrapped("Here you can start the selected game or change settings.");
-                ImGui::Separator();
+                auto button_size = ImVec2{ImGui::GetContentRegionAvailWidth(),0.f};
 
-                if (ImGui::Button("Show information", button_size)) start_state = start_game_e::START_GAME_STATE_INFORMATION;
-                if (ImGui::Button("Show controls", button_size)) start_state = start_game_e::START_GAME_STATE_CONTROLS;
-                if (ImGui::Button("View options", button_size)) start_state = start_game_e::START_GAME_STATE_OPTIONS;
-                if (ImGui::Button("Play", button_size))
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+
+                if (start_state == start_game_e::START_GAME_STATE_MAIN)
                 {
+                    ImGui::TextWrapped("Here you can start the selected game or change settings.");
+                    ImGui::Separator();
+
+                    if (ImGui::Button("Show information", button_size)) start_state = start_game_e::START_GAME_STATE_INFORMATION;
+                    if (ImGui::Button("Show controls", button_size)) start_state = start_game_e::START_GAME_STATE_CONTROLS;
+                    if (ImGui::Button("View options", button_size)) { start_state = start_game_e::START_GAME_STATE_OPTIONS; load_align_combo = load_resolution = true; }
+                    if (ImGui::Button("Play", button_size))
+                    {
 #ifndef PLATFORM_NS
+                        const auto& gamename = selected_game_menu->get_information().name;
+
+                        video_settings_t game_video_settings(
+                            &settings->get(gamename + "_video_fps"),
+                            &settings->get(gamename + "_video_vsync"),
+                            &settings->get(gamename + "_video_fullscreen"),
+                            &settings->get(gamename + "_video_resolution"),
+                            &settings->get(gamename + "_draw_fps"),
+                            &settings->get(gamename + "_draw_frametime"),
+                            &settings->get(gamename + "_draw_playtime"),
+                            &settings->get(gamename + "_draw_position_alignment"),
+                            &settings->get(gamename + "_lostfocus_timeout_time")
+                        );
+
+                        // Grab the wanted resolution from our settings
+                        auto old_resolution = area_size_t(1280, 720); // 720p default
+                        {
+                            auto res = settings->get_main_settings().resolution->get<std::string>();
+                            auto pos = res.find_first_of('x');
+
+                            if (pos != std::string::npos)
+                            {
+                                old_resolution.width = std::stoi(res.substr(0, pos));
+                                old_resolution.height = std::stoi(res.substr(pos + 1));
+                            }
+                        }
+
+                        auto wanted_resolution = area_size_t(1280, 720); // 720p default
+                        {
+                            auto res = game_video_settings.resolution;
+                            auto pos = res.find_first_of('x');
+
+                            if (pos != std::string::npos)
+                            {
+                                wanted_resolution.width = std::stoi(res.substr(0, pos));
+                                wanted_resolution.height = std::stoi(res.substr(pos + 1));
+                            }
+                        }
+
+                        settings->get_main_settings().resolution_area = wanted_resolution;
+
+                        if (original_video_settings.differs(game_video_settings))
+                        {
+                            settings->get_main_settings().fps->set(game_video_settings.fps);
+                            settings->get_main_settings().fullscreen->set(game_video_settings.fullscreen);
+                            settings->get_main_settings().resolution->set(game_video_settings.resolution);
+                            settings->get_main_settings().vsync->set(game_video_settings.vsync);
+
+                            reset_video_mode = reset_game = true;
+                        }
+                        else
+                        {
+                            selected_game->base_reset(settings, false);
+                        }
+
+                        settings->get_main_settings().resolution_area = old_resolution;
+#endif
+
+                        game_running = true;
+                    }
+                }
+                else if (start_state == start_game_e::START_GAME_STATE_OPTIONS)
+                {
+                    static auto window_bg_color = main_window_bg_color;
+                    static auto frame_bg_color = ImVec4{window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier};
+                    static auto text_selected_bg = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f};
+                    static auto slidergrab_color = text_selected_bg;
+                    static auto slidergrab_color_active = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f};
+
+#if defined(PLATFORM_LINUX) || defined(PLATFORM_WINDOWS)
+                    ImGui::TextWrapped("Video options");
+                    ImGui::Separator();
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
+                    ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
+                    ImGui::PushStyleColor(ImGuiCol_SliderGrab, slidergrab_color);
+                    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, slidergrab_color_active);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
+
                     const auto& gamename = selected_game_menu->get_information().name;
 
                     video_settings_t game_video_settings(
                         &settings->get(gamename + "_video_fps"),
                         &settings->get(gamename + "_video_vsync"),
                         &settings->get(gamename + "_video_fullscreen"),
-                        &settings->get(gamename + "_video_resolution")
+                        &settings->get(gamename + "_video_resolution"),
+                        &settings->get(gamename + "_draw_fps"),
+                        &settings->get(gamename + "_draw_frametime"),
+                        &settings->get(gamename + "_draw_playtime"),
+                        &settings->get(gamename + "_draw_position_alignment"),
+                        &settings->get(gamename + "_lostfocus_timeout_time")
                     );
 
-                    // Grab the wanted resolution from our settings
-                    auto old_resolution = area_size_t(1280, 720); // 720p default
-                    {
-                        auto res = settings->get_main_settings().resolution->get<std::string>();
-                        auto pos = res.find_first_of('x');
+                    ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
+                    ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!");
 
-                        if (pos != std::string::npos)
+                    ImGui::PopStyleColor(6);
+
+                    // booleans
+                    ImGui::Separator();
+
+                    ImGuiUser::toggle_button(game_video_settings.cfgvalue_fullscreen, "Fullscreen", "Turns on/off fullscreen video mode.");
+                    ImGuiUser::toggle_button(game_video_settings.cfgvalue_vsync, "Vertical sync", "Turns on/off vertical sync. Reduces screen tearing, although framerate will be limited to the refresh rate of your monitor.");
+                    ImGuiUser::toggle_button(game_video_settings.cfgvalue_draw_fps, "Draw FPS", "If enabled, the FPS will be drawn in games using the specified alignment.");
+                    ImGuiUser::toggle_button(game_video_settings.cfgvalue_draw_frametime, "Draw frametime", "If enabled, the frametime (in ms) will be drawn in games using the specified alignment.");
+                    ImGuiUser::toggle_button(game_video_settings.cfgvalue_draw_playtime, "Draw playtime", "If enabled, the playtime (hh:mm:ss:ms) will be drawn in games using the specified alignment.");
+
+                    // Combos
+                    ImGui::Separator();
+
+                    static auto& supported_resolutions = util::get_supported_resolutions();
+                    static auto selected_resolution_func = [&]() -> int32_t
+                    {
+                        // Grab the wanted resolution from our settings
+                        auto resolution = area_size_t(1280, 720); // 720p default
                         {
-                            old_resolution.width = std::stoi(res.substr(0, pos));
-                            old_resolution.height = std::stoi(res.substr(pos + 1));
+                            auto res = game_video_settings.resolution;
+                            auto pos = res.find_first_of('x');
+
+                            if (pos != std::string::npos)
+                            {
+                                resolution.width = std::stoi(res.substr(0, pos));
+                                resolution.height = std::stoi(res.substr(pos + 1));
+                            }
+                        }
+
+                        // The default resolution in case the selected one wasn't found
+                        constexpr int32_t default_resolution = 0;
+
+                        // Return the found resolution
+                        auto found = std::find_if(supported_resolutions.first.begin(), supported_resolutions.first.end(), [&resolution](const std::tuple<uint16_t, uint16_t, uint16_t>& p) -> bool
+                        {
+                            return static_cast<uint32_t>(std::get<0>(p)) == resolution.width && static_cast<uint32_t>(std::get<1>(p)) == resolution.height;
+                        });
+
+                        return found != supported_resolutions.first.end() ? static_cast<int32_t>(std::distance(supported_resolutions.first.begin(), found)) : default_resolution;
+                    };
+
+                    static int32_t selected_resolution = 0;
+
+                    if (load_resolution)
+                    {
+                        load_resolution = false;
+
+                        selected_resolution = selected_resolution_func();
+                    }
+
+                    ImGui::TextUnformatted("Resolution:");
+                    ImGui::SameLine();
+
+                    ImGuiUser::help_marker("NOTE: Only 16:9 resolutions are supported (standard widescreen format).");
+
+                    ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth());
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, {window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier});
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
+                    ImGui::PushStyleColor(ImGuiCol_Header, {1.f,1.f,1.f,0.f});
+                    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
+                    ImGui::PushStyleColor(ImGuiCol_HeaderActive, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
+
+                    if (ImGui::Combo("##res", &selected_resolution, supported_resolutions.second.c_str()))
+                    {
+                        auto& res = supported_resolutions.first.at(static_cast<std::size_t>(selected_resolution));
+
+                        game_video_settings.cfgvalue_resolution->set(std::to_string(std::get<0>(res)) + 'x' + std::to_string(std::get<1>(res)));
+                    }
+
+                    ImGui::TextUnformatted("Info alignment:");
+                    ImGui::SameLine();
+
+                    ImGuiUser::help_marker("FPS, frametime and playtime to be drawn via this alignment (if any of them are enabled).");
+
+                    static int32_t align_item = 0;
+
+                    if (load_align_combo)
+                    {
+                        load_align_combo = false;
+
+                        auto alignment = game_video_settings.cfgvalue_draw_position->get<std::string>();
+
+                        std::transform(alignment.begin(), alignment.end(), alignment.begin(), ::tolower);
+
+                        if (alignment.length() >= 7)
+                        {
+                            if (alignment.compare("topright") == 0) align_item = 1;
+                            else if (alignment.compare("bottomleft") == 0) align_item = 2;
+                            else if (alignment.compare("bottomright") == 0) align_item = 3;
+                            else if (alignment.compare("topcenter") == 0) align_item = 4;
+                            else if (alignment.compare("bottomcenter") == 0) align_item = 5;
                         }
                     }
 
-                    auto wanted_resolution = area_size_t(1280, 720); // 720p default
-                    {
-                        auto res = game_video_settings.resolution;
-                        auto pos = res.find_first_of('x');
+                    static const char* alignment_items[] = { "Top left", "Top right", "Bottom left", "Bottom right", "Top center", "Bottom center" };
 
-                        if (pos != std::string::npos)
-                        {
-                            wanted_resolution.width = std::stoi(res.substr(0, pos));
-                            wanted_resolution.height = std::stoi(res.substr(pos + 1));
-                        }
+                    if (ImGui::Combo("##ialign", &align_item, alignment_items, 6))
+                    {
+                        std::string new_alignment = alignment_items[align_item];
+
+                        new_alignment.erase(std::remove(new_alignment.begin(), new_alignment.end(), ' '), new_alignment.end());
+
+                        std::transform(new_alignment.begin(), new_alignment.end(), new_alignment.begin(), tolower);
+
+                        game_video_settings.cfgvalue_draw_position->set(new_alignment);
                     }
 
-                    settings->get_main_settings().resolution_area = wanted_resolution;
-
-                    if (original_video_settings.differs(game_video_settings))
-                    {
-                        settings->get_main_settings().fps->set(game_video_settings.fps);
-                        settings->get_main_settings().fullscreen->set(game_video_settings.fullscreen);
-                        settings->get_main_settings().resolution->set(game_video_settings.resolution);
-                        settings->get_main_settings().vsync->set(game_video_settings.vsync);
-
-                        reset_video_mode = true;
-                    }
-
-                    selected_game->reset(settings);
-
-                    settings->get_main_settings().resolution_area = old_resolution;
+                    ImGui::PopItemWidth();
+                    ImGuiUser::frame_height_spacing();
 #endif
 
-                    game_running = true;
+                    ImGui::TextWrapped("Game options");
+                    ImGui::Separator();
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
+                    ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
+                    ImGui::PushStyleColor(ImGuiCol_SliderGrab, slidergrab_color);
+                    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, slidergrab_color_active);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
+
+#ifdef PLATFORM_NS
+                    ImGui::PushStyleColor(ImGuiCol_Header, {1.f,1.f,1.f,0.f});
+                    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
+                    ImGui::PushStyleColor(ImGuiCol_HeaderActive, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
+#endif
+
+                    selected_game_menu->draw_options(global_scaling);
+
+#ifndef PLATFORM_NS
+                    ImGui::PopStyleVar(2);
+                    ImGui::PopStyleColor(12);
+#else
+                    ImGui::PopStyleVar();
+                    ImGui::PopStyleColor(9);
+#endif
+
+
+                    if (subwindow_button_pressed)
+                    {
+                        // Back
+                        start_state = start_game_e::START_GAME_STATE_MAIN;
+                        
+                        subwindow_button_pressed = false;
+                    }
+                    else if (subwindow_button_pressed_2)
+                    {
+#ifndef PLATFORM_NS
+                        // Apply defaults
+                        game_video_settings.cfgvalue_draw_fps->set(settings->get_main_settings().draw_fps->get<bool>());
+                        game_video_settings.cfgvalue_draw_frametime->set(settings->get_main_settings().draw_frametime->get<bool>());
+                        game_video_settings.cfgvalue_draw_playtime->set(settings->get_main_settings().draw_playtime->get<bool>());
+                        game_video_settings.cfgvalue_draw_position->set(settings->get_main_settings().draw_position->get<std::string>());
+                        game_video_settings.cfgvalue_timeout_time->set(settings->get_main_settings().timeout_time->get<uint32_t>());
+                        game_video_settings.cfgvalue_fps->set(settings->get_main_settings().fps->get<uint32_t>());
+                        game_video_settings.cfgvalue_fullscreen->set(settings->get_main_settings().fullscreen->get<bool>());
+                        game_video_settings.cfgvalue_resolution->set(settings->get_main_settings().resolution->get<std::string>());
+                        game_video_settings.cfgvalue_vsync->set(settings->get_main_settings().vsync->get<bool>());
+                        game_video_settings.load_from_cfgvalues();
+#else
+                        const auto& gamename = selected_game_menu->get_information().name;
+
+                        settings->get(gamename + "_draw_fps").set(settings->get_main_settings().draw_fps->get<bool>());
+                        settings->get(gamename + "_draw_frametime").set(settings->get_main_settings().draw_frametime->get<bool>());
+                        settings->get(gamename + "_draw_playtime").set(settings->get_main_settings().draw_playtime->get<bool>());
+                        settings->get(gamename + "_draw_position_alignment").set(settings->get_main_settings().draw_position->get<std::string>());
+                        settings->get(gamename + "_lostfocus_timeout_time").set(settings->get_main_settings().timeout_time->get<uint32_t>());
+#endif
+
+                        load_align_combo = load_resolution = true;
+                    }
                 }
+                else if (start_state == start_game_e::START_GAME_STATE_CONTROLS)
+                {
+                    selected_game_menu->draw_controls(global_scaling);
+
+                   if (subwindow_button_pressed) { start_state = start_game_e::START_GAME_STATE_MAIN; subwindow_button_pressed = false; }
+                }
+                else
+                {
+                    selected_game_menu->draw_information(global_scaling);
+
+                    if (subwindow_button_pressed) { start_state = start_game_e::START_GAME_STATE_MAIN; subwindow_button_pressed = false; }
+                }
+
+                ImGui::PopStyleVar();
             }
-            else if (start_state == start_game_e::START_GAME_STATE_OPTIONS)
+            else if (selected_item == selection_e::selection_select_game)
             {
-                static auto window_bg_color = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+                ImGui::Text("Available games:");
+                ImGui::Separator();
+                ImGui::Columns(4, nullptr, false);
+
+                auto border_size = 1.f;
+                auto button_size_box = std::ceil(((static_cast<float>(resolution_area.width) - indent_width * 2.f) - selection_size.x) / 4.f) - (ImGui::GetStyle().ItemSpacing.x + border_size * 2.f);
+                auto button_size = ImVec2(button_size_box, button_size_box);
+
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, border_size);
+
+                for (const auto& game : games)
+                {
+                    const auto& game_name = game.second->get_information().name;
+
+                    if (ImGui::Button(game_name.c_str(), button_size))
+                    {
+                        set_notification(std::string("Game selected: ") + game_name);
+
+                        selected_game = games_manager->select_game(game_name);
+                        selected_game_menu = selected_game;
+                        selected_game_name = game_name;
+
+                        ImGui::NextColumn();
+                    }
+                }
+
+                ImGui::PopStyleVar();
+                ImGui::Columns(1);
+            }
+            else if (selected_item == selection_e::selection_options)
+            {
+                ImGui::TextWrapped("These are the default settings. Games will use these settings on first load, although they can be modified per-game.");
+                ImGui::Separator();
+
+                static auto window_bg_color = main_window_bg_color;
                 static auto frame_bg_color = ImVec4{window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier};
                 static auto text_selected_bg = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f};
                 static auto slidergrab_color = text_selected_bg;
                 static auto slidergrab_color_active = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f};
 
-#if defined(PLATFORM_LINUX) || defined(PLATFORM_WINDOWS)
-                ImGui::TextWrapped("Video options");
-                ImGui::Separator();
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+#ifdef PLATFORM_NS
+                // sliders
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
                 ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab, slidergrab_color);
@@ -556,24 +945,87 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
                 ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
 
-                const auto& gamename = selected_game_menu->get_information().name;
+                ImGuiUser::inputslider_uint32_t(settings->get_main_settings().timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!");
 
-                video_settings_t game_video_settings(
-                    &settings->get(gamename + "_video_fps"),
-                    &settings->get(gamename + "_video_vsync"),
-                    &settings->get(gamename + "_video_fullscreen"),
-                    &settings->get(gamename + "_video_resolution")
-                );
+                ImGui::PopStyleColor(6);
 
-                ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
+                // booleans
+                ImGuiUser::toggle_button(settings->get_main_settings().draw_fps, "Draw FPS", "If enabled, the FPS will be drawn in games using the specified alignment.");
+                ImGuiUser::toggle_button(settings->get_main_settings().draw_frametime, "Draw frametime", "If enabled, the frametime (in ms) will be drawn in games using the specified alignment.");
+                ImGuiUser::toggle_button(settings->get_main_settings().draw_playtime, "Draw playtime", "If enabled, the playtime (hh:mm:ss:ms) will be drawn in games using the specified alignment.");
+
+                // Combos
+                ImGui::Separator();
+
+                auto window_bg_color = main_window_bg_color;
+
+                ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth());
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, {window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier});
+                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
+                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
+                ImGui::PushStyleColor(ImGuiCol_Header, {1.f,1.f,1.f,0.f});
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
+                ImGui::TextUnformatted("Info alignment:");
+                ImGui::SameLine();
+
+                ImGuiUser::help_marker("FPS, frametime and playtime to be drawn via this alignment (if any of them are enabled).");
+
+                static int align_item = [&]()
+                {
+                    auto alignment = settings->get_main_settings().draw_position->get<std::string>();
+
+                    std::transform(alignment.begin(), alignment.end(), alignment.begin(), ::tolower);
+
+                    if (alignment.length() >= 7)
+                    {
+                        if (alignment.compare("topright") == 0) return 1;
+                        else if (alignment.compare("bottomleft") == 0) return 2;
+                        else if (alignment.compare("bottomright") == 0) return 3;
+                        else if (alignment.compare("topcenter") == 0) return 4;
+                        else if (alignment.compare("bottomcenter") == 0) return 5;
+                    }
+
+                    return 0;
+                }();
+
+                static const char* alignment_items[] = { "Top left", "Top right", "Bottom left", "Bottom right", "Top center", "Bottom center" };
+
+                if (ImGui::Combo("##ialign", &align_item, alignment_items, 6))
+                {
+                    std::string new_alignment = alignment_items[align_item];
+
+                    new_alignment.erase(std::remove(new_alignment.begin(), new_alignment.end(), ' '), new_alignment.end());
+
+                    std::transform(new_alignment.begin(), new_alignment.end(), new_alignment.begin(), tolower);
+
+                    settings->get_main_settings().draw_position->set(new_alignment);
+                }
+
+                ImGui::PopStyleColor(6);
+                ImGui::PopItemWidth();
+    #else
+                // sliders
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
+                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
+                ImGui::PushStyleColor(ImGuiCol_SliderGrab, slidergrab_color);
+                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, slidergrab_color_active);
+                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
+                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
+
+                ImGuiUser::inputslider_uint32_t(settings->get_main_settings().fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
+                ImGuiUser::inputslider_uint32_t(settings->get_main_settings().timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!");
 
                 ImGui::PopStyleColor(6);
 
                 // booleans
                 ImGui::Separator();
 
-                ImGuiUser::toggle_button(game_video_settings.cfgvalue_fullscreen, "Fullscreen", "Turns on/off fullscreen video mode.");
-                ImGuiUser::toggle_button(game_video_settings.cfgvalue_vsync, "Vertical sync", "Turns on/off vertical sync. Reduces screen tearing, although framerate will be limited to the refresh rate of your monitor.");
+                ImGuiUser::toggle_button(settings->get_main_settings().fullscreen, "Fullscreen", "Turns on/off fullscreen video mode.");
+                ImGuiUser::toggle_button(settings->get_main_settings().vsync, "Vertical sync", "Turns on/off vertical sync. Reduces screen tearing, although framerate will be limited to the refresh rate of your monitor.");
+                ImGuiUser::toggle_button(settings->get_main_settings().draw_fps, "Draw FPS", "If enabled, the FPS will be drawn in games using the specified alignment.");
+                ImGuiUser::toggle_button(settings->get_main_settings().draw_frametime, "Draw frametime", "If enabled, the frametime (in ms) will be drawn in games using the specified alignment.");
+                ImGuiUser::toggle_button(settings->get_main_settings().draw_playtime, "Draw playtime", "If enabled, the playtime (hh:mm:ss:ms) will be drawn in games using the specified alignment.");
 
                 // Combos
                 ImGui::Separator();
@@ -582,17 +1034,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 static auto selected_resolution = [&]() -> int32_t
                 {
                     // Grab the wanted resolution from our settings
-                    auto resolution = area_size_t(1280, 720); // 720p default
-                    {
-                        auto res = game_video_settings.resolution;
-                        auto pos = res.find_first_of('x');
-
-                        if (pos != std::string::npos)
-                        {
-                            resolution.width = std::stoi(res.substr(0, pos));
-                            resolution.height = std::stoi(res.substr(pos + 1));
-                        }
-                    }
+                    auto resolution = settings->get_main_settings().resolution_area;
 
                     // The default resolution in case the selected one wasn't found
                     constexpr int32_t default_resolution = 0;
@@ -623,233 +1065,139 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 {
                     auto& res = supported_resolutions.first.at(static_cast<std::size_t>(selected_resolution));
 
-                    game_video_settings.cfgvalue_resolution->set(std::to_string(std::get<0>(res)) + 'x' + std::to_string(std::get<1>(res)));
+                    settings->get_main_settings().resolution->set(std::to_string(std::get<0>(res)) + 'x' + std::to_string(std::get<1>(res)));
                 }
 
+                ImGui::TextUnformatted("Info alignment:");
+                ImGui::SameLine();
+
+                ImGuiUser::help_marker("FPS, frametime and playtime to be drawn via this alignment (if any of them are enabled).");
+
+                static int align_item = [&]()
+                {
+                    auto alignment = settings->get_main_settings().draw_position->get<std::string>();
+
+                    std::transform(alignment.begin(), alignment.end(), alignment.begin(), ::tolower);
+
+                    if (alignment.length() >= 7)
+                    {
+                        if (alignment.compare("topright") == 0) return 1;
+                        else if (alignment.compare("bottomleft") == 0) return 2;
+                        else if (alignment.compare("bottomright") == 0) return 3;
+                        else if (alignment.compare("topcenter") == 0) return 4;
+                        else if (alignment.compare("bottomcenter") == 0) return 5;
+                    }
+
+                    return 0;
+                }();
+
+                static const char* alignment_items[] = { "Top left", "Top right", "Bottom left", "Bottom right", "Top center", "Bottom center" };
+
+                if (ImGui::Combo("##ialign", &align_item, alignment_items, 6))
+                {
+                    std::string new_alignment = alignment_items[align_item];
+
+                    new_alignment.erase(std::remove(new_alignment.begin(), new_alignment.end(), ' '), new_alignment.end());
+
+                    std::transform(new_alignment.begin(), new_alignment.end(), new_alignment.begin(), tolower);
+
+                    settings->get_main_settings().draw_position->set(new_alignment);
+                }
+
+                ImGui::PopStyleColor(6);
                 ImGui::PopItemWidth();
-                ImGuiUser::frame_height_spacing();
-#endif
 
-                ImGui::TextWrapped("Game options");
-                ImGui::Separator();
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
-                ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
-                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab, slidergrab_color);
-                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, slidergrab_color_active);
-                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
-                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
-
-#ifdef PLATFORM_NS
-                ImGui::PushStyleColor(ImGuiCol_Header, {1.f,1.f,1.f,0.f});
-                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
-                ImGui::PushStyleColor(ImGuiCol_HeaderActive, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
-#endif
-
-                selected_game_menu->draw_options(global_scaling);
-
-#ifndef PLATFORM_NS
-                ImGui::PopStyleVar(2);
-                ImGui::PopStyleColor(12);
-#else
-                ImGui::PopStyleVar();
-                ImGui::PopStyleColor(9);
-#endif
-
-                auto screen_pos = ImGui::GetCursorScreenPos();
-
-                screen_pos.y += ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeight();
-
-                ImGui::SetCursorScreenPos(screen_pos);
-
-                if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) start_state = start_game_e::START_GAME_STATE_MAIN;
-            }
-            else if (start_state == start_game_e::START_GAME_STATE_CONTROLS)
-            {
-                selected_game_menu->draw_controls(global_scaling);
-
-                auto screen_pos = ImGui::GetCursorScreenPos();
-
-                screen_pos.y += ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeight();
-
-                ImGui::SetCursorScreenPos(screen_pos);
-
-                if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) start_state = start_game_e::START_GAME_STATE_MAIN;
-            }
-            else
-            {
-                selected_game_menu->draw_information(global_scaling);
-
-                auto screen_pos = ImGui::GetCursorScreenPos();
-
-                screen_pos.y += ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeight();
-
-                ImGui::SetCursorScreenPos(screen_pos);
-
-                if (ImGui::Button("Back", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) start_state = start_game_e::START_GAME_STATE_MAIN;
-            }
-
-            ImGui::PopStyleVar();
-        }
-        else if (selected_item == selection_e::selection_select_game)
-        {
-            ImGui::Text("Available games:");
-            ImGui::Separator();
-            ImGui::Columns(4, nullptr, false);
-
-            auto border_size = 1.f;
-            auto button_size_box = std::ceil(((static_cast<float>(resolution_area.width) - indent_width * 2.f) - selection_size.x) / 4.f) - (ImGui::GetStyle().ItemSpacing.x + border_size * 2.f);
-            auto button_size = ImVec2(button_size_box, button_size_box);
-
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, border_size);
-
-            for (const auto& game : games)
-            {
-                const auto& game_name = game.second->get_information().name;
-
-                if (ImGui::Button(game_name.c_str(), button_size))
+                // Apply button, move to bottom of the window
+                if (subwindow_button_pressed)
                 {
-                    set_notification(std::string("Game selected: ") + game_name);
+                    subwindow_button_pressed = false;
 
-                    selected_game = games_manager->select_game(game_name);
-                    selected_game_menu = selected_game;
-                    selected_game_name = game_name;
+                    auto new_video_settings = video_settings_t(settings);
 
-                    ImGui::NextColumn();
+                    if (original_video_settings.differs(new_video_settings))
+                    {
+                        reset_video_mode = true;
+
+                        original_video_settings = new_video_settings;
+
+                        set_notification("Video settings changed!");
+                    }
+                    else
+                    {
+                        set_notification("No video settings changed!");
+                    }
                 }
+#endif
+            }
+            else if (selected_item == selection_e::selection_exit)
+            {
+                ImGui::TextWrapped("Until next time, hope you enjoyed ;)");
+                ImGui::Separator();
+
+                auto button_size = ImVec2{ImGui::GetContentRegionAvailWidth(),0.f};
+
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+
+                if (ImGui::Button("Exit", button_size)) should_exit = true;
+
+                ImGui::PopStyleVar();
+            }
+            else if (selected_item == selection_e::selection_credits)
+            {
+                ImGui::TextWrapped("Every external influence to this project is listed here. I'm sorry if I forgot anyone or anything, feel free to remind me though.");
+                ImGui::Separator();
+                ImGui::BulletText("ocornut - Dear ImGui");
+                ImGui::BulletText("devkitpro/libnx - compiler toolchain/SDK for the Switch");
+                ImGui::BulletText("RetroArch - Design inspiration");
+                ImGui::BulletText("nlohmann - JSON library");
+                ImGui::BulletText("Microsoft - DirectX SDK (Windows backend) + Win32API");
+                ImGui::BulletText("GLFW - Linux backend");
+                ImGui::BulletText("Probably various other things I forgot");
             }
 
-            ImGui::PopStyleVar();
-            ImGui::Columns(1);
+            if (draw_bottom_button)
+            {
+                ImGui::EndChild();
+                ImGui::PopStyleColor();
+            }
         }
-        else if (selected_item == selection_e::selection_options)
-        {   
-#ifdef PLATFORM_NS
-            ImGui::TextUnformatted("No options for the current platform.");
-#else
-            ImGui::TextWrapped("These are the default settings. If there's override settings available for the selected game, those will be used instead.");
-            ImGui::Separator();
 
-            static auto window_bg_color = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
-            static auto frame_bg_color = ImVec4{window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier};
-            static auto text_selected_bg = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f};
-            static auto slidergrab_color = text_selected_bg;
-            static auto slidergrab_color_active = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f};
-
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
-            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
-            ImGui::PushStyleColor(ImGuiCol_SliderGrab, slidergrab_color);
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, slidergrab_color_active);
-            ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
-            ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
-
-            ImGuiUser::inputslider_uint32_t(settings->get_main_settings().fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
-
-            ImGui::PopStyleColor(6);
-
-            // booleans
-            ImGui::Separator();
-
-            ImGuiUser::toggle_button(settings->get_main_settings().fullscreen, "Fullscreen", "Turns on/off fullscreen video mode.");
-            ImGuiUser::toggle_button(settings->get_main_settings().vsync, "Vertical sync", "Turns on/off vertical sync. Reduces screen tearing, although framerate will be limited to the refresh rate of your monitor.");
-
-            // Combos
-            ImGui::Separator();
-
-            static auto& supported_resolutions = util::get_supported_resolutions();
-            static auto selected_resolution = [&]() -> int32_t
-            {
-                // Grab the wanted resolution from our settings
-                auto resolution = settings->get_main_settings().resolution_area;
-
-                // The default resolution in case the selected one wasn't found
-                constexpr int32_t default_resolution = 0;
-
-                // Return the found resolution
-                auto found = std::find_if(supported_resolutions.first.begin(), supported_resolutions.first.end(), [&resolution](const std::tuple<uint16_t, uint16_t, uint16_t>& p) -> bool
-                {
-                    return static_cast<uint32_t>(std::get<0>(p)) == resolution.width && static_cast<uint32_t>(std::get<1>(p)) == resolution.height;
-                });
-
-                return found != supported_resolutions.first.end() ? static_cast<int32_t>(std::distance(supported_resolutions.first.begin(), found)) : default_resolution;
-            }();
-
-            ImGui::TextUnformatted("Resolution:");
-            ImGui::SameLine();
-
-            ImGuiUser::help_marker("NOTE: Only 16:9 resolutions are supported (standard widescreen format).");
-
-            ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth());
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, {window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier});
-            ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
-            ImGui::PushStyleColor(ImGuiCol_FrameBgActive, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
-            ImGui::PushStyleColor(ImGuiCol_Header, {1.f,1.f,1.f,0.f});
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
-
-            if (ImGui::Combo("##res", &selected_resolution, supported_resolutions.second.c_str()))
-            {
-                auto& res = supported_resolutions.first.at(static_cast<std::size_t>(selected_resolution));
-
-                settings->get_main_settings().resolution->set(std::to_string(std::get<0>(res)) + 'x' + std::to_string(std::get<1>(res)));
-            }
-
-            ImGui::PopStyleColor(6);
-            ImGui::PopItemWidth();
-
-            // Apply button, move to bottom of the window
-            auto screen_pos = ImGui::GetCursorScreenPos();
-
-            screen_pos.y += ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeight();
-
-            ImGui::SetCursorScreenPos(screen_pos);
+        if (draw_bottom_button)
+        {
+            ImGui::SetNextWindowPos(ImVec2(indent_width + selection_size.x + ImGui::GetStyle().WindowPadding.x, (selection_pos.y+(selection_size.y-ImGui::GetFrameHeightWithSpacing()))-window_y_offset), ImGuiCond_Always);
+            ImGui::PushStyleColor(ImGuiCol_Border,{1.f,1.f,1.f,1.f});
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{ImGui::GetStyle().ItemSpacing.x,0.f});
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{ImGui::GetStyle().WindowPadding.x,0.f});
 
-            if (ImGui::Button("Apply", ImVec2{ImGui::GetContentRegionAvailWidth(),0.f}))
+            if (ImGui::BeginChild("Main child window #2", ImVec2(((static_cast<float>(resolution_area.width) - indent_width * 2.f) - selection_size.x)-ImGui::GetStyle().WindowPadding.x*2.f, ImGui::GetFrameHeightWithSpacing()+window_y_offset), false, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove/* | ImGuiWindowFlags_NoNav*/))
             {
-                auto new_video_settings = video_settings_t(settings);
-
-                if (original_video_settings.differs(new_video_settings))
+                if (subwindow_button_text_2.empty())
                 {
-                    reset_video_mode = true;
-
-                    original_video_settings = new_video_settings;
-
-                    set_notification("Video settings changed!");
+                    if (ImGui::Button(subwindow_button_text.c_str(), ImVec2{ImGui::GetContentRegionAvailWidth(),0.f})) subwindow_button_pressed = true;
                 }
                 else
                 {
-                    set_notification("No video settings changed!");
+                    //ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{ImGui::GetStyle().ItemSpacing.x,0.f});
+
+                    auto button_size = ImVec2{ImGui::GetContentRegionAvailWidth()*.5f-ImGui::GetStyle().ItemSpacing.x*.5f,0.f};
+
+                    if (ImGui::Button(subwindow_button_text.c_str(), button_size)) subwindow_button_pressed = true;
+
+                    ImGui::SameLine();
+
+                    if (ImGui::Button(subwindow_button_text_2.c_str(), button_size)) subwindow_button_pressed_2 = true;
+
+                    //ImGui::PopStyleVar();
                 }
+
+                ImGui::EndChild();
             }
 
-            ImGui::PopStyleVar();
-#endif
-        }
-        else if (selected_item == selection_e::selection_exit)
-        {
-            ImGui::TextWrapped("Until next time, hope you enjoyed ;)");
-            ImGui::Separator();
-
-            auto button_size = ImVec2{ImGui::GetContentRegionAvailWidth(),0.f};
-
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
-
-            if (ImGui::Button("Exit", button_size)) should_exit = true;
-
-            ImGui::PopStyleVar();
-        }
-        else if (selected_item == selection_e::selection_credits)
-        {
-            ImGui::TextWrapped("Every external influence to this project is listed here. I'm sorry if I forgot anyone or anything, feel free to remind me though.");
-            ImGui::Separator();
-            ImGui::BulletText("ocornut - Dear ImGui");
-            ImGui::BulletText("devkitpro/libnx - compiler toolchain/SDK for the Switch");
-            ImGui::BulletText("RetroArch - Design inspiration");
-            ImGui::BulletText("nlohmann - JSON library");
-            ImGui::BulletText("Microsoft - DirectX SDK (Windows backend) + Win32API");
-            ImGui::BulletText("GLFW - Linux backend");
-            ImGui::BulletText("Probably various other things I forgot");
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(5);
         }
 
         ImGui::End();
@@ -885,16 +1233,16 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
     // draw the currently selected item
     ImGui::PushFont(default_font_big);
-    ImGui::GetForegroundDrawList()->AddText(ImVec2(indent_width * 2.f, indent_height * .5f - ImGui::GetFontSize() * .5f), ImGui::GetColorU32({1.f,1.f,1.f,1.f}), selection_names[static_cast<uint8_t>(selected_item)].c_str());
+    ImGui::GetBackgroundDrawList()->AddText(ImVec2(indent_width * 2.f, indent_height * .5f - ImGui::GetFontSize() * .5f), ImGui::GetColorU32({1.f,1.f,1.f,1.f}), selection_names[static_cast<uint8_t>(selected_item)].c_str());
     ImGui::PopFont();
 
     // lines at the top and bottom
-    ImGui::GetForegroundDrawList()->AddLine(ImVec2(indent_width, indent_height), ImVec2(resolution_area.width - indent_width, indent_height), ImGui::GetColorU32({1.f, 1.f, 1.f, 1.f}));
-    ImGui::GetForegroundDrawList()->AddLine(ImVec2(indent_width, indent_height + selection_size.y), ImVec2(resolution_area.width - indent_width, indent_height + selection_size.y), ImGui::GetColorU32({1.f,1.f,1.f,1.f}));
+    ImGui::GetBackgroundDrawList()->AddLine(ImVec2(indent_width, indent_height), ImVec2(resolution_area.width - indent_width, indent_height), ImGui::GetColorU32({1.f, 1.f, 1.f, 1.f}));
+    ImGui::GetBackgroundDrawList()->AddLine(ImVec2(indent_width, indent_height + selection_size.y), ImVec2(resolution_area.width - indent_width, indent_height + selection_size.y), ImGui::GetColorU32({1.f,1.f,1.f,1.f}));
 
     // selected game
     ImGui::PushFont(default_font_small);
-    ImGui::GetForegroundDrawList()->AddText(ImVec2(indent_width * 2.f, static_cast<float>(resolution_area.height) - indent_height * .5f - ImGui::GetFontSize() * .5f), ImGui::GetColorU32({1.f,1.f,1.f,1.f}), (std::string("v") + CPP_RETRO_GAMES_VERSION + " - selected game: " + selected_game_menu->get_information().name).c_str());
+    ImGui::GetBackgroundDrawList()->AddText(ImVec2(indent_width * 2.f, static_cast<float>(resolution_area.height) - indent_height * .5f - ImGui::GetFontSize() * .5f), ImGui::GetColorU32({1.f,1.f,1.f,1.f}), (std::string("v") + CPP_RETRO_GAMES_VERSION + " - selected game: " + selected_game_menu->get_information().name).c_str());
     ImGui::PopFont();
 
     // fps
@@ -904,7 +1252,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
     sprintf(fps_text, "fps: %.0f", ImGui::GetIO().Framerate);
 
-    ImGui::GetForegroundDrawList()->AddText(ImVec2((resolution_area.width - indent_width * 2.f) - ImGui::CalcTextSize(fps_text).x, static_cast<float>(resolution_area.height) - indent_height * .5f - ImGui::GetFontSize() * .5f), ImGui::GetColorU32({1.f,1.f,1.f,1.f}), fps_text);
+    ImGui::GetBackgroundDrawList()->AddText(ImVec2((resolution_area.width - indent_width * 2.f) - ImGui::CalcTextSize(fps_text).x, static_cast<float>(resolution_area.height) - indent_height * .5f - ImGui::GetFontSize() * .5f), ImGui::GetColorU32({1.f,1.f,1.f,1.f}), fps_text);
     ImGui::PopFont();
 
     return should_exit;

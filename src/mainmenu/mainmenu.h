@@ -34,15 +34,23 @@ namespace retrogames
 
         game_base_t* selected_game;
 
-        ImFont *default_font_small, *default_font_big;
+        ImFont *default_font_small, *default_font_big, *default_font_mid;
 
         settings_t* settings;
 
         bool game_running;
+        bool reset_game;
 
         float global_scaling;
 
     public:
+
+        /*
+        @brief
+
+            Called on reset
+        */
+        void reset(void);
 
         /*
         @brief
@@ -56,7 +64,7 @@ namespace retrogames
 
             Constructor
         */
-        mainmenu_t() : selected_game(nullptr), games_manager(nullptr), game_running(false), global_scaling(1.f) {}
+        mainmenu_t() : selected_game(nullptr), games_manager(nullptr), game_running(false), global_scaling(1.f), reset_game(false) {}
 
         /*
         @brief

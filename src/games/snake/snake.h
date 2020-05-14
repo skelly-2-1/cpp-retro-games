@@ -5,7 +5,7 @@
 
 @purpose
 
-	Actual snake game and GUI functionality
+	Snake game and GUI functionality
 */
 
 #pragma once
@@ -22,12 +22,10 @@
 #include "misc/unique_ptr_array_matrix.h"
 #include "misc/settings.h"
 #include "misc/timer.h"
-#include "games/base.h"
+#include "games/base/base.h"
 
 namespace retrogames
 {
-
-	class settings_t;
 
     namespace games
     {
@@ -255,11 +253,8 @@ namespace retrogames
             // Tells us if the snake died or not
             bool dead;
 
-            // The time since starting (death timeout)
+            // The time since starting (death/start timeout)
             timer_t timeout_timer;
-
-            // Our settings
-            settings_t* settings;
 
             // Did we just eat?
             bool eaten;
@@ -426,7 +421,7 @@ namespace retrogames
 
                 Constructor
             */
-            snake_t(settings_t* settings, const std::string& name, const std::string& version = "1.0", uint8_t* icon = nullptr);
+            snake_t(settings_t* settings, const std::string& name, ImFont** default_font_small, ImFont** default_font_mid, ImFont** default_font_big, const std::string& version = "1.0", uint8_t* icon = nullptr);
 
             /*
             @brief
@@ -461,7 +456,7 @@ namespace retrogames
 
                 Resets information (when we re-start the game)
             */
-            virtual void reset(settings_t* settings) override;
+            virtual void reset(settings_t* settings, bool create_fonts) override;
 
             /*
             @brief

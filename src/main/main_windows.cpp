@@ -48,6 +48,38 @@ namespace retrogames
 /*
 @brief
 
+	Turns a key wparam to an ImGuiKey
+*/
+static auto to_imgui_key = [](WPARAM wparam) -> ImGuiKey
+{
+	static bool reverse_keymap_init = true;
+	static std::unordered_map<int, ImGuiKey> reverse_keymap;
+
+	if (reverse_keymap_init)
+	{
+		reverse_keymap_init = false;
+
+		auto& io = ImGui::GetIO();
+
+		for (uint8_t i = 0; i < static_cast<uint8_t>(ImGuiKey_COUNT); i++)
+		{
+			auto key = static_cast<ImGuiKey>(i);
+			auto raw_key = io.KeyMap[i];
+
+			reverse_keymap[raw_key] = key;
+		}
+	}
+
+	if (reverse_keymap.empty()) return ImGuiKey_COUNT;
+
+	auto f = reverse_keymap.find(static_cast<int>(wparam));
+
+	return f != reverse_keymap.end() ? f->second : ImGuiKey_COUNT;
+};
+
+/*
+@brief
+
 	Our window procedure that captures all the Windows messages
 */
 LRESULT CALLBACK retrogames::window_procedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -80,36 +112,12 @@ LRESULT CALLBACK retrogames::window_procedure(HWND hwnd, UINT msg, WPARAM wparam
 		}
 		case WM_KEYDOWN: case WM_KEYUP:
 		{
-			static auto to_imgui_key = [&wparam]() -> ImGuiKey
+			if (msg == WM_KEYUP || !((static_cast<int>(lparam) >> 30) & 1)) // ignore repeat messages on WM_KEYDOWN
 			{
-				static bool reverse_keymap_init = true;
-				static std::unordered_map<int, ImGuiKey> reverse_keymap;
+				auto found_key = to_imgui_key(wparam);
 
-				if (reverse_keymap_init)
-				{
-					reverse_keymap_init = false;
-
-					auto& io = ImGui::GetIO();
-
-					for (uint8_t i = 0; i < static_cast<uint8_t>(ImGuiKey_COUNT); i++)
-					{
-						auto key = static_cast<ImGuiKey>(i);
-						auto raw_key = io.KeyMap[i];
-
-						reverse_keymap[raw_key] = key;
-					}
-				}
-
-				if (reverse_keymap.empty()) return ImGuiKey_COUNT;
-
-				auto f = reverse_keymap.find(static_cast<int>(wparam));
-
-				return f != reverse_keymap.end() ? f->second : ImGuiKey_COUNT;
-			};
-
-			auto found_key = to_imgui_key();
-
-			if (found_key != static_cast<ImGuiKey>(ImGuiKey_COUNT)) main_handle_key(msg == WM_KEYDOWN, found_key);
+				if (found_key != static_cast<ImGuiKey>(ImGuiKey_COUNT)) main_handle_key(msg == WM_KEYDOWN, found_key);
+			}
 
 			break;
 		}
@@ -247,6 +255,8 @@ void retrogames::main(void)
 
 				break;
 			}
+
+			window = imgui->get_window();
 
 			// Tell anything else that the video mode changed
 			main_reset();

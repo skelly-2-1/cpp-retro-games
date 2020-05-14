@@ -735,9 +735,8 @@ void retrogames::games::snake_t::do_reset(void)
 
     Constructor, loads settings among other things
 */
-retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& name, const std::string& version/* = "1.0"*/, uint8_t* icon/* = nullptr*/) :
-    game_base_t(game_information_t::create(name, version, icon), settings),
-    settings(settings),
+retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& name, ImFont** default_font_small, ImFont** default_font_mid, ImFont** default_font_big, const std::string& version/* = "1.0"*/, uint8_t* icon/* = nullptr*/) :
+    game_base_t(game_information_t::create(name, version, icon), settings, default_font_small, default_font_mid, default_font_big),
     eaten(false),
     start_timeout_timer(true),
     game_state(GAME_STATE::GAME_STATE_DEFAULT),
@@ -1311,7 +1310,7 @@ void retrogames::games::snake_t::generate_food(void)
 
     Resets information (when we re-start the game)
 */
-void retrogames::games::snake_t::reset(settings_t* settings)
+void retrogames::games::snake_t::reset(settings_t* settings, bool create_fonts)
 {
     // Reset everything that has to do with video settings
     resolution_area = settings->get_main_settings().resolution_area;
