@@ -3,6 +3,7 @@ Retro games made by Steven Kelly in C++. Supports Windows, Linux and the Nintend
 
 # Games
 * Snake
+* Pingpong
 * More games soon™
 
 # Compiling
