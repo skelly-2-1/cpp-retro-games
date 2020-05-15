@@ -129,18 +129,12 @@ namespace retrogames
 
                 bool last_dead, last_dead_needs_reset;
                 bool last_death, last_death_needs_reset;
-                bool last_pause, last_pause_needs_reset;
                 bool last_render;
-                bool last_timeout_timer_started, last_timeout_timer_started_needs_reset;
                 bool interpolate_last_time;
 
                 void reset(void)
                 {
-                    last_pause = last_death = last_dead = false;
-                    last_pause_needs_reset = last_death_needs_reset = last_dead_needs_reset = true;
                     last_render = true;
-                    last_timeout_timer_started = false;
-                    last_timeout_timer_started_needs_reset = true;
                     interpolate_last_time = false;
                     direction = DIRECTION::SNAKE_DIRECTION_DEFAULT;
                 }
