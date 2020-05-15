@@ -61,7 +61,7 @@ bool retrogames::games::snake_t::draw(bool render)
         ImGui::PushStyleColor(ImGuiCol_Border, { 0.0f, 0.0f, 0.0f, 0.0f });
         ImGui::PushStyleColor(ImGuiCol_BorderShadow, { 0.0f, 0.0f, 0.0f, 0.0f });
         ImGui::PushStyleColor(ImGuiCol_WindowBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-        ImGui::Begin(fmt, nullptr, flags | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+        ImGui::Begin(fmt, nullptr, flags | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav);
         ImGui::SetWindowPos(pos, ImGuiCond_Always);
         ImGui::SetWindowSize(size, ImGuiCond_Always);
 
