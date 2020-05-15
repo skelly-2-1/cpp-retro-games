@@ -36,6 +36,8 @@ namespace retrogames
 
         ImFont *default_font_small, *default_font_big, *default_font_mid;
 
+        cfgvalue_t* selected_game_name;
+
         settings_t* settings;
 
         bool game_running;
