@@ -225,6 +225,20 @@ namespace retrogames
         /*
         @brief
 
+            Starts timeout
+        */
+        void start_timeout(void) { base_static_vars.timeout_timer.stop(); base_static_vars.timeout_timer.start(); }
+
+        /*
+        @brief
+
+            Resets the playtime
+        */
+        void reset_playtime(void) { base_static_vars.playtime = {}; base_static_vars.start_timer.stop(); }
+
+        /*
+        @brief
+
             Returns the time elapsed since a chrono::high_resolution_clock::time_point.
             Hours, minutes, seconds, milliseconds
         */

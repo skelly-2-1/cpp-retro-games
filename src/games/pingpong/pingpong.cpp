@@ -156,6 +156,8 @@ bool retrogames::games::pingpong_t::draw(bool render)
                 right_paddle->reset(resolution_area, ++right_paddle->points);
                 left_paddle->reset(resolution_area, left_paddle->points);
                 ball->reset(resolution_area, right_paddle->points+left_paddle->points);
+
+                start_timeout();
             }
             else if (ball->x + static_cast<double>(std::ceil(ball->size / 2)) >= static_cast<double>(resolution_area.width) - 1.)
             {
@@ -163,6 +165,8 @@ bool retrogames::games::pingpong_t::draw(bool render)
                 left_paddle->reset(resolution_area, ++left_paddle->points);
                 right_paddle->reset(resolution_area, right_paddle->points);
                 ball->reset(resolution_area, right_paddle->points+left_paddle->points);
+
+                start_timeout();
             }
         }
 

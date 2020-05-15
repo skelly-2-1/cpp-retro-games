@@ -87,42 +87,6 @@ namespace retrogames
 
             };
 
-            // Tells us about the current state of the game
-            enum class GAME_STATE : uint8_t
-            {
-
-                GAME_STATE_MAIN_MENU,
-                GAME_STATE_OPTIONS_MENU,
-                GAME_STATE_HIGHSCORES_MENU,
-                GAME_STATE_PLAYING,
-
-                // Default game state/starting screen
-                GAME_STATE_DEFAULT = GAME_STATE_MAIN_MENU
-
-            };
-
-            // Tells us about the current state of the main menu
-            enum class MAIN_MENU_STATE : uint8_t
-            {
-
-                MAIN_MENU_STATE_MAIN,
-                MAIN_MENU_STATE_OPTIONS,
-
-                // Default main menu state
-                MAIN_MENU_STATE_DEFAULT = MAIN_MENU_STATE_MAIN
-
-            };
-
-            // Tells us about the current state of the pause menu
-            enum class PAUSE_STATE : uint8_t
-            {
-
-                PAUSE_STATE_MAIN,
-                PAUSE_STATE_CONFIRM_MAIN_MENU,
-                PAUSE_STATE_CONFIRM_CLOSE_GAME
-
-            };
-
             // Tells us about the current state of the death menu
             enum class DEATH_STATE : uint8_t
             {
@@ -187,15 +151,6 @@ namespace retrogames
 
             static_vars_t static_vars;
 
-            // The current state of the game
-            GAME_STATE game_state;
-
-            // The current state of the main menu
-            MAIN_MENU_STATE main_menu_state;
-
-            // The current state of the pause menu
-            PAUSE_STATE pause_state;
-
             // The current state of the death menu
             DEATH_STATE death_state;
 
@@ -207,14 +162,8 @@ namespace retrogames
             // if we want to move.
             fpsmanager_t fpsmanager;
 
-            // The start timer (starts when we press play)
-            timer_t start_timer;
-
             // Used to pulsate colors
             std::chrono::high_resolution_clock::time_point death_time;
-
-            // Did we pause the game?
-            bool paused;
 
             // How many boxes we have per axis
             uint32_t box_amount;
@@ -253,8 +202,8 @@ namespace retrogames
             // Tells us if the snake died or not
             bool dead;
 
-            // The time since starting (death/start timeout)
-            timer_t timeout_timer;
+            // Tells us if we just started
+            bool just_started;
 
             // Did we just eat?
             bool eaten;
@@ -262,11 +211,8 @@ namespace retrogames
             // Should we exit the application?
             bool should_exit;
 
-            // Start the timeout timer?
-            bool start_timeout_timer;
-
             // Stores the time in the current game we survived
-            std::tuple<uint16_t, uint16_t, uint16_t, uint16_t> time_survived;
+            playtime_t time_survived;
 
             // Did we hit pause?
             bool hit_pause;
@@ -282,13 +228,6 @@ namespace retrogames
 
             // Resolution area
             area_size_t resolution_area;
-
-            /*
-            @brief
-
-                Converts a color_t to an ImU32 (used by ImGui for rendering)
-            */
-            ImU32 to_imgui_color(color_t color);
 
             /*
             @brief
@@ -352,30 +291,9 @@ namespace retrogames
             /*
             @brief
 
-                Draws the pause menu
-            */
-            void draw_pause_menu(void);
-
-            /*
-            @brief
-
                 Draws the death menu
             */
             void draw_death_menu(void);
-
-            /*
-            @brief
-
-                Draws the main menu
-            */
-            void draw_main_menu(void);
-
-            /*
-            @brief
-
-                Draws the highscores menu
-            */
-            void draw_highscores_menu(void);
 
             /*
             @brief
@@ -398,14 +316,6 @@ namespace retrogames
                 Needs to be called when the snake eats
             */
             void eat(void);
-
-            /*
-            @brief
-
-                Returns the time elapsed since a chrono::high_resolution_clock::time_point.
-                Hours, minutes, seconds, milliseconds
-            */
-            std::tuple<uint16_t, uint16_t, uint16_t, uint16_t> get_time_elapsed(const std::chrono::high_resolution_clock::time_point& point);
 
             /*
             @brief

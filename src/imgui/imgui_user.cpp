@@ -163,10 +163,10 @@ void ImGuiUser::draw_info(const ImVec2& pos, std::string info)
     auto text_color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
     auto background_color = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
     auto size = ImVec2{ImGui::CalcTextSize(info.c_str()).x + ImGui::GetStyle().FramePadding.x * 2.f + ImGui::GetStyle().ItemSpacing.x,ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y * 2.f};
-    auto pos_ = ImVec2{pos.x - size.x * .5f, pos.y - size.y * .5f};
 
-    ImGui::SetNextWindowPos(pos_, ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2{pos.x - size.x * .5f, pos.y - size.y * .5f}, ImGuiCond_Always);
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+    ImGui::SetNextWindowFocus();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, background_color);

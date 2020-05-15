@@ -35,46 +35,6 @@ uint8_t retrogames::games::snake_t::current_modal_popup_id = 0;
 */
 bool retrogames::games::snake_t::draw(bool render)
 {
-    // When the game is minimized (render = false), offset the start_time by the duration between renders
-    // (minimizing and opening)
-    static std::chrono::high_resolution_clock::time_point render_pause_begin;
-
-    if (static_vars.last_render != render)
-    {
-        static_vars.last_render = render;
-
-        if (!render)
-        {
-            render_pause_begin = std::chrono::high_resolution_clock::now();
-        }
-        else
-        {
-            // (Re)Start the timeout timer
-            timeout_timer.start();
-
-            // When we have to draw again (after minimizing the game), offset the start_time by the time between the renders
-            if (start_timer.started() && game_state == GAME_STATE::GAME_STATE_PLAYING) start_timer.offset_by_time(render_pause_begin);
-        }
-    }
-
-    // Pause and unpause the start timer if we minimize and open the game again
-    if (static_vars.last_timeout_timer_started_needs_reset)
-    {
-        static_vars.last_timeout_timer_started_needs_reset = false;
-        static_vars.last_timeout_timer_started = timeout_timer.started();
-    }
-
-    if (static_vars.last_timeout_timer_started != timeout_timer.started())
-    {
-        static_vars.last_timeout_timer_started = timeout_timer.started();
-
-        if (start_timer.started())
-        {
-            if (!timeout_timer.started() && start_timer.paused() && !paused) start_timer.unpause();
-            else if (timeout_timer.started() && !start_timer.paused()) start_timer.pause();
-        }
-    }
-
     if (!render) return false;
 
     // Calculate the space we have available to the right and left of the actual snake playing field.
@@ -115,24 +75,13 @@ bool retrogames::games::snake_t::draw(bool render)
         if (no_padding) ImGui::PopStyleVar(2);
     };
 
-    if (game_state == GAME_STATE::GAME_STATE_PLAYING)
-    {
-        // Create an imgui window at our snake playing field to draw to
-        imgui_window(true, 0, snake_playing_field_position, snake_playing_field_size, [this]() { draw_field(); }, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs);
+    // Create an imgui window at our snake playing field to draw to
+    imgui_window(true, 0, snake_playing_field_position, snake_playing_field_size, [this]() { draw_field(); }, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs);
 
-        // Create imgui windows for the left/right sides of the window to draw to
-        imgui_window(false, 1, ImVec2(0.f, 0.f), ImVec2(static_cast<float>(left_right_distance), resolution_area.height), [this]() { draw_left_window(); });
-        imgui_window(false, 2, ImVec2(static_cast<float>(left_right_distance) + snake_playing_field_size.x, 0.f), ImVec2(static_cast<float>(left_right_distance), resolution_area.height), [this]() { draw_right_window(); });
-    }
-    else if (game_state == GAME_STATE::GAME_STATE_MAIN_MENU)
-    {
-        draw_main_menu();
-    }
-    else if (game_state == GAME_STATE::GAME_STATE_HIGHSCORES_MENU)
-    {
-        draw_highscores_menu();
-    }
-
+    // Create imgui windows for the left/right sides of the window to draw to
+    imgui_window(false, 1, ImVec2(0.f, 0.f), ImVec2(static_cast<float>(left_right_distance), resolution_area.height), [this]() { draw_left_window(); });
+    imgui_window(false, 2, ImVec2(static_cast<float>(left_right_distance) + snake_playing_field_size.x, 0.f), ImVec2(static_cast<float>(left_right_distance), resolution_area.height), [this]() { draw_right_window(); });
+    
     if (should_exit)
     {
         should_exit = false;
@@ -155,13 +104,6 @@ void retrogames::games::snake_t::draw_field(void)
 
     // Fill the playing field background
     draw_filled_rect(ImVec2(0, 0), window_size, color_t(0, 0, 0));
-
-    // Start the "start timer" if need be
-    if (start_timeout_timer)
-    {
-        timeout_timer.start();
-        start_timeout_timer = false;
-    }
 
     // List of parts for the snake, so we can first draw the outline and then the snake on top
     static std::deque<std::tuple<ImVec2, color_t, color_t>> parts;
@@ -250,12 +192,12 @@ void retrogames::games::snake_t::draw_field(void)
     {
         if (hit_pause)
         {
-            paused = !paused;
+            toggle_pause();
 
             hit_pause = false;
         }
 
-        if (!paused)
+        if (!is_paused())
         {
             auto dir = think();
 
@@ -271,7 +213,7 @@ void retrogames::games::snake_t::draw_field(void)
             scale = 1.f;
         }
     }
-    else if (timeout_timer.started())
+    else if (is_in_timeout())
     {
         scale = 0.f;
     }
@@ -500,57 +442,6 @@ void retrogames::games::snake_t::draw_field(void)
     // If the player is dead, draw the death menu
     // and if the game is paused, draw a pause menu
     if (dead) draw_death_menu();
-    else if (paused) draw_pause_menu();
-}
-
-/*
-@brief
-
-    Draws the pause menu
-*/
-void retrogames::games::snake_t::draw_pause_menu(void)
-{
-    modal_popup("##pausemenu", true)
-    {
-		static auto button_size = ImVec2(100.f * 3.f, 0.f);
-
-        if (pause_state == PAUSE_STATE::PAUSE_STATE_MAIN)
-        {
-            if (ImGui::Button("Continue", button_size))
-            {
-                ImGui::CloseCurrentPopup();
-
-                paused = false;
-            }
-
-            if (ImGui::Button("Back to main menu", button_size)) pause_state = PAUSE_STATE::PAUSE_STATE_CONFIRM_CLOSE_GAME;//PAUSE_STATE::PAUSE_STATE_CONFIRM_MAIN_MENU;
-            //if (ImGui::Button("Close game", button_size)) pause_state = PAUSE_STATE::PAUSE_STATE_CONFIRM_CLOSE_GAME;
-        }
-        else
-        {
-            ImGui::Text("Are you sure?");
-
-            if (ImGui::Button("Yes", ImVec2(65.f, 0.)))
-            {
-                if (pause_state == PAUSE_STATE::PAUSE_STATE_CONFIRM_CLOSE_GAME)
-                {
-                    // Close the game
-                    should_exit = true;
-                }
-                else
-                {
-                    // Return to main menu
-                    game_state = GAME_STATE::GAME_STATE_MAIN_MENU;
-
-                    ImGui::CloseCurrentPopup();
-                }
-            }
-
-            ImGui::SameLine();
-
-            if (ImGui::Button("No", ImVec2(65.f, 0.))) pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
-        }
-    }
 }
 
 /*
@@ -562,7 +453,7 @@ void retrogames::games::snake_t::draw_filled_rect(const ImVec2& pos, const ImVec
 {
     auto window_pos = ImGui::GetWindowPos();
 
-    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(window_pos.x + pos.x, window_pos.y + pos.y), ImVec2(window_pos.x + pos.x + size.x, window_pos.y + pos.y + size.y), to_imgui_color(color));
+    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(window_pos.x + pos.x, window_pos.y + pos.y), ImVec2(window_pos.x + pos.x + size.x, window_pos.y + pos.y + size.y), ImGuiUser::color_to_imgui_color_u32(color));
 }
 
 /*
@@ -574,7 +465,7 @@ void retrogames::games::snake_t::draw_rect(const ImVec2& pos, const ImVec2& size
 {
     auto window_pos = ImGui::GetWindowPos();
 
-    ImGui::GetWindowDrawList()->AddRect(ImVec2(window_pos.x + pos.x, window_pos.y + pos.y), ImVec2(window_pos.x + pos.x + size.x, window_pos.y + pos.y + size.y), to_imgui_color(color));
+    ImGui::GetWindowDrawList()->AddRect(ImVec2(window_pos.x + pos.x, window_pos.y + pos.y), ImVec2(window_pos.x + pos.x + size.x, window_pos.y + pos.y + size.y), ImGuiUser::color_to_imgui_color_u32(color));
 }
 
 /*
@@ -587,7 +478,7 @@ void retrogames::games::snake_t::draw_line(const ImVec2& pos_1, const ImVec2& po
 {
     auto window_pos = ImGui::GetWindowPos();
 
-    ImGui::GetWindowDrawList()->AddLine(ImVec2(window_pos.x + pos_1.x, window_pos.y + pos_1.y), ImVec2(window_pos.x + pos_2.x, window_pos.y + pos_2.y), to_imgui_color(color), thickness);
+    ImGui::GetWindowDrawList()->AddLine(ImVec2(window_pos.x + pos_1.x, window_pos.y + pos_1.y), ImVec2(window_pos.x + pos_2.x, window_pos.y + pos_2.y), ImGuiUser::color_to_imgui_color_u32(color), thickness);
 }
 
 /*
@@ -597,11 +488,11 @@ void retrogames::games::snake_t::draw_line(const ImVec2& pos_1, const ImVec2& po
 */
 void retrogames::games::snake_t::handle_key(ImGuiKey key, bool pressed)
 {
-    if (!pressed || game_state != GAME_STATE::GAME_STATE_PLAYING) return;
+    if (!pressed) return;
 
     // Escape (un)pauses the game
-    if (key == ImGuiKey_Escape && game_state == GAME_STATE::GAME_STATE_PLAYING && !dead) hit_pause = true;
-    if (paused || (!paused && hit_pause)) return;
+    if (key == ImGuiKey_Escape && !dead) hit_pause = true;
+    if (is_paused() || (!is_paused() && hit_pause)) return;
 
     // Helper function to add a direction to our direction stack (thread-safe)
     static auto add_direction = [this](DIRECTION dir)
@@ -708,15 +599,8 @@ void retrogames::games::snake_t::do_reset(void)
     // Didn't hit false
     hit_pause = false;
 
-    // Tell the timeout system that it should restart
-    start_timeout_timer = true;
-
     // And finally, reset our fps manager
     fpsmanager.reset();
-
-    // Reset all of our timers
-    timeout_timer.stop();
-    start_timer.stop();
 
     // No foods anymore
     foods.clear();
@@ -724,10 +608,8 @@ void retrogames::games::snake_t::do_reset(void)
     // Didn't move yet
     move_counter = move_eat_counter = 0;
 
-    // Start the game immediately
-    game_state = GAME_STATE::GAME_STATE_PLAYING;
-    pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
-    paused = false;
+    // We just started
+    just_started = true;
 }
 
 /*
@@ -738,12 +620,8 @@ void retrogames::games::snake_t::do_reset(void)
 retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& name, ImFont** default_font_small, ImFont** default_font_mid, ImFont** default_font_big, const std::string& version/* = "1.0"*/, uint8_t* icon/* = nullptr*/) :
     game_base_t(game_information_t::create(name, version, icon), settings, default_font_small, default_font_mid, default_font_big),
     eaten(false),
-    start_timeout_timer(true),
-    game_state(GAME_STATE::GAME_STATE_DEFAULT),
-    main_menu_state(MAIN_MENU_STATE::MAIN_MENU_STATE_DEFAULT),
-    pause_state(PAUSE_STATE::PAUSE_STATE_MAIN),
+    just_started(true),
     death_state(DEATH_STATE::DEATH_STATE_MAIN),
-    paused(false),
     should_exit(false),
     hit_pause(false),
     move_counter(0),
@@ -778,11 +656,6 @@ retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& nam
     style.Colors[ImGuiCol_Button] = { 0.f, 0.f, 0.f, 0.f };
     style.Colors[ImGuiCol_ButtonActive] = { .8f, .8f, .8f, 1.f };
     style.Colors[ImGuiCol_ButtonHovered] = { .2f, .2f, .2f, 1.f };
-
-    // Start the game immediately
-    game_state = GAME_STATE::GAME_STATE_PLAYING;
-    pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
-    paused = false;
 }
 
 /*
@@ -833,47 +706,24 @@ void retrogames::games::snake_t::eat(void)
 /*
 @brief
 
-    Converts a color_t to an ImU32 (used by ImGui for rendering)
-*/
-ImU32 retrogames::games::snake_t::to_imgui_color(color_t color)
-{
-    return ImGui::GetColorU32({
-                static_cast<float>(color.r()) / 255.f,
-                static_cast<float>(color.g()) / 255.f,
-                static_cast<float>(color.b()) / 255.f,
-                static_cast<float>(color.a()) / 255.f });
-}
-
-/*
-@brief
-
     Handles game logic, moves the snake if need be
 */
 retrogames::games::snake_t::DIRECTION retrogames::games::snake_t::think(void)
 {
     // Check for timeout
-    if (setting_timeout.get<uint32_t>() > 0 && timeout_timer.started())
-    {
-        // Return if we're still in timeout
-        if (timeout_timer.paused()) return DIRECTION::SNAKE_DIRECTION_NONE; // Timeout timer paused means we're still in timeout
-
-        auto delay = static_cast<long long>(static_cast<uint16_t>(static_cast<uint64_t>(setting_timeout.get<uint32_t>()) * 1000));
-
-        if (timeout_timer.get_elapsed().count() < delay) return DIRECTION::SNAKE_DIRECTION_NONE;
-    }
+    if (is_in_timeout()) return DIRECTION::SNAKE_DIRECTION_NONE;
 
     // Check if we want to move our snake. We don't want to do that every frame
     // (60 moves a second would be too fast)
     // Also check if we're dead, the game is paused or we're in the start timeout
-    if (!fpsmanager.should_run() || dead || paused) return DIRECTION::SNAKE_DIRECTION_NONE;
+    if (!fpsmanager.should_run() || dead || is_paused()) return DIRECTION::SNAKE_DIRECTION_NONE;
 
-    // Set the start time if it didn't happen already
-    if (!start_timer.started())
+    // If we just started, generate food
+    if (just_started)
     {
-        start_timer.start();
-
-        // Also means the game just started, generate a food
         generate_food();
+
+        just_started = false;
     }
 
     // Determine the direction
@@ -1008,56 +858,19 @@ bool retrogames::games::snake_t::move(const DIRECTION dir)
 */
 void retrogames::games::snake_t::draw_left_window(void)
 {
-    // Pause and unpause the start timer if we pause the game
-    if (static_vars.last_pause_needs_reset)
-    {
-        static_vars.last_pause_needs_reset = false;
-        static_vars.last_pause = paused;
-    }
-
-    if (static_vars.last_pause != paused)
-    {
-        static_vars.last_pause = paused;
-
-        if (paused && !start_timer.paused()) start_timer.pause();
-        else if (!paused && !timeout_timer.started()) start_timer.unpause();
-    }
-
-    // Set the time survived according to if we're dead or not
-    if (static_vars.last_death_needs_reset)
-    {
-        static_vars.last_death = dead;
-        static_vars.last_death_needs_reset = false;
-    }
-
     if (static_vars.last_death != dead)
     {
         static_vars.last_death = dead;
 
-        if (dead) time_survived = get_time_elapsed(start_timer.get_time_point());
+        if (dead) time_survived = get_playtime();
     }
 
-    if (!dead && !paused && !timeout_timer.started())
+    if (!dead && !is_paused() && !is_in_timeout())
     {
-        time_survived = get_time_elapsed(start_timer.get_time_point());
+        time_survived = get_playtime();
     }
 
-    // Draw the time elapsed
-    auto elapsed = start_timer.started() ? time_survived : std::make_tuple<uint16_t, uint16_t, uint16_t, uint16_t>(0, 0, 0, 0);
-
-    // No. Just no.
-    if (!(std::get<0>(elapsed) >= 24))
-	{
-		ImGui::Text("Playtime:");
-		ImGui::Text("%02i:%02i:%02i:%03i", std::get<0>(elapsed), std::get<1>(elapsed), std::get<2>(elapsed), std::get<3>(elapsed));
-		ImGui::Spacing();
-	}
-
-    // Display the playtime, FPS and frametime
-    auto& io = ImGui::GetIO();
-
-    ImGui::Text("FPS: %.0f", io.Framerate);
-    ImGui::Text("Frametime: %.2fms", static_cast<float>(static_cast<double>(io.DeltaTime) * 1000.));
+    // Display the score
     ImGui::Text("Score: %i", static_cast<int32_t>(position_history.size()));
 }
 
@@ -1069,22 +882,7 @@ void retrogames::games::snake_t::draw_left_window(void)
 */
 void retrogames::games::snake_t::draw_right_window(void)
 {
-    // Draw the timeout if we need to
-    if (setting_timeout.get<uint32_t>() <= 0) return;
-
-    auto delay = static_cast<uint64_t>(static_cast<uint16_t>(static_cast<uint64_t>(setting_timeout.get<uint32_t>()) * 1000));
-    auto draw_timeout = [&delay](uint64_t elapsed)
-    {
-        auto time_left = static_cast<uint8_t>(std::ceil((static_cast<double>(delay) - static_cast<double>(elapsed)) / 1000.));
-
-        ImGui::TextUnformatted("Timeout:");
-		ImGui::Text("%i second(s)", static_cast<uint32_t>(time_left));
-    };
-
-    auto elapsed = static_cast<uint64_t>(timeout_timer.get_elapsed().count());
-
-    if (elapsed <= delay) draw_timeout(elapsed);
-    else timeout_timer.stop();
+    
 }
 
 /*
@@ -1133,41 +931,6 @@ retrogames::games::snake_t::modal_popup_t::~modal_popup_t()
 /*
 @brief
 
-    Draws the main menu
-*/
-void retrogames::games::snake_t::draw_main_menu(void)
-{
-    // Create the popup
-    modal_popup("##mainmenu")
-    {
-        static auto button_size = ImVec2(100.f * 3.f, 0.f);
-
-        if (ImGui::Button("Start game", button_size))
-        {
-            // Start the game
-            game_state = GAME_STATE::GAME_STATE_PLAYING;
-            pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
-            paused = false;
-
-            // Reset all variables in case we've already played
-            do_reset();
-        }
-
-        // Not implemented yet
-        /*if (ImGui::Button("Highscores", button_size))
-        {
-            game_state = GAME_STATE::GAME_STATE_HIGHSCORES_MENU;
-
-            ImGui::CloseCurrentPopup();
-        }*/
-
-        if (ImGui::Button("Exit", button_size)) should_exit = true;
-    }
-}
-
-/*
-@brief
-
     Draws the death menu
 */
 void retrogames::games::snake_t::draw_death_menu(void)
@@ -1182,30 +945,28 @@ void retrogames::games::snake_t::draw_death_menu(void)
 
             ImGui::Text("You died.");
             ImGui::Text("Time alive:");
-            ImGui::Text("%02i:%02i:%02i:%03i", std::get<0>(time_survived), std::get<1>(time_survived), std::get<2>(time_survived), std::get<3>(time_survived));
+            ImGui::Text("%02i:%02i:%02i:%03i", time_survived.hours, time_survived.minutes, time_survived.seconds, time_survived.milliseconds);
 
             if (ImGui::Button("Retry", button_size))
             {
-                // Start the game
-                game_state = GAME_STATE::GAME_STATE_PLAYING;
-                pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
-                paused = false;
-
                 // Reset all variables in case we've already played
                 do_reset();
+
+                // Time out again
+                start_timeout();
+
+                // Reset the playtime
+                reset_playtime();
 
                 ImGui::CloseCurrentPopup();
             }
 
             if (ImGui::Button("Back to main menu", button_size))
             {
-                //game_state = GAME_STATE::GAME_STATE_MAIN_MENU;
                 death_state = DEATH_STATE::DEATH_STATE_CONFIRM_CLOSE;
 
                 ImGui::CloseCurrentPopup();
             }
-
-            //if (ImGui::Button("Close game", button_size)) death_state = DEATH_STATE::DEATH_STATE_CONFIRM_CLOSE;
         }
         else
         {
@@ -1234,40 +995,6 @@ void retrogames::games::snake_t::draw_options(float scaling)
     ImGuiUser::inputslider_uint32_t(&setting_timeout, "Timeout (in seconds)", 10u, 0u, "How many seconds the game is in timeout when starting or tabbing back into the game.", scaling);
     ImGuiUser::inputslider_uint32_t(&setting_field_size, "Resolution (X2)", 25u, 3u, "How many boxes are in one axis * 2 (x, y) * 2 = games' field resolution.", scaling);
     ImGuiUser::inputslider_uint32_t(&setting_speed, "Speed", 60u, 1u, "How many times the snake moves from one box to another in a single second.", scaling);
-}
-
-/*
-@brief
-
-    Draws the highscores menu
-*/
-void retrogames::games::snake_t::draw_highscores_menu(void)
-{
-
-}
-
-/*
-@brief
-
-    Returns the time elapsed since a chrono::high_resolution_clock::time_point.
-    Hours, minutes, seconds, milliseconds
-*/
-std::tuple<uint16_t, uint16_t, uint16_t, uint16_t> retrogames::games::snake_t::get_time_elapsed(const std::chrono::high_resolution_clock::time_point& point)
-{
-    uint16_t time_elapsed_ms, time_elapsed_seconds, time_elapsed_minutes, time_elapsed_hours;
-
-    auto total_time_elapsed_ns = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - point).count());
-    auto total_time_elapsed_ms = total_time_elapsed_ns / 1000000.0; // to microseconds to milliseconds
-    auto total_time_elapsed_seconds = total_time_elapsed_ms / 1000.0; // to seconds
-    auto total_time_elapsed_minutes = total_time_elapsed_seconds / 60.0; // to minutes
-    auto total_time_elapsed_hours = total_time_elapsed_minutes / 60.0; // to hours
-
-    time_elapsed_hours = static_cast<uint16_t>(std::floor(total_time_elapsed_hours));
-    time_elapsed_minutes = static_cast<uint16_t>(std::floor(total_time_elapsed_minutes - static_cast<double>(static_cast<uint64_t>(time_elapsed_hours) * 60)));
-    time_elapsed_seconds = static_cast<uint16_t>(std::floor(total_time_elapsed_seconds - static_cast<double>(static_cast<uint64_t>(time_elapsed_minutes) * 60) - static_cast<double>(static_cast<uint64_t>(time_elapsed_hours) * 3600)));
-    time_elapsed_ms = static_cast<uint16_t>(std::floor(total_time_elapsed_ms - static_cast<double>(static_cast<uint64_t>(time_elapsed_seconds) * 1000) - static_cast<double>(static_cast<uint64_t>(time_elapsed_minutes) * 60000) - static_cast<double>(static_cast<uint64_t>(time_elapsed_hours) * 3600000)));
-
-    return std::make_tuple(time_elapsed_hours, time_elapsed_minutes, time_elapsed_seconds, time_elapsed_ms);
 }
 
 /*
@@ -1322,11 +1049,7 @@ void retrogames::games::snake_t::reset(settings_t* settings, bool create_fonts)
     positions = unique_ptr_array_matrix_t<POSITION_STATE>(setting_field_size.get<uint32_t>() * 2, setting_field_size.get<uint32_t>() * 2);
 
     // Misc
-    game_state = GAME_STATE::GAME_STATE_DEFAULT;
-    main_menu_state = MAIN_MENU_STATE::MAIN_MENU_STATE_DEFAULT;
-    pause_state = PAUSE_STATE::PAUSE_STATE_MAIN;
     death_state = DEATH_STATE::DEATH_STATE_MAIN;
-    paused = false;
     should_exit = false;
     hit_pause = false;
     move_counter = 0;

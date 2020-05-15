@@ -183,7 +183,7 @@ bool retrogames::game_base_t::base_draw(bool render)
             base_static_vars.last_pause = paused;
 
             if (paused && !base_static_vars.start_timer.paused()) base_static_vars.start_timer.pause();
-            else if (!paused && !base_static_vars.timeout_timer.started()) base_static_vars.start_timer.unpause();
+            else if (!paused/* && !base_static_vars.timeout_timer.started()*/) { base_static_vars.timeout_timer.stop(); base_static_vars.timeout_timer.start(); }//base_static_vars.start_timer.unpause();
         }
 
         // Stop the timeout timer if it exceeded the time
@@ -198,23 +198,20 @@ bool retrogames::game_base_t::base_draw(bool render)
     }
 
     // Now, do any drawing that we need to do
-    bool ret = draw(render);
+    auto ret = draw(render);
 
     // Draw the timeout time if we're still in timeout
-    if (base_static_vars.timeout_timer.started())
+    if (base_static_vars.timeout_timer.started() && !paused)
     {
-        static auto draw_timeout = [&](uint64_t elapsed)
-        {
-            auto delay = static_cast<uint64_t>(static_cast<uint16_t>(static_cast<uint64_t>(timeout_time) * 1000));
-            auto time_left = static_cast<uint8_t>(std::ceil((static_cast<double>(delay) - static_cast<double>(elapsed)) / 1000.));
-            auto pos = ImVec2{static_cast<float>(base_resolution_area.width / 2),static_cast<float>(base_resolution_area.height/10)};
-
-            ImGui::PushFont(get_default_font_small());
-            ImGuiUser::draw_info(pos, std::string("Timeout: ") + std::to_string(time_left) + "s");
-            ImGui::PopFont();
-        };
-
-        draw_timeout(static_cast<uint64_t>(base_static_vars.timeout_timer.get_elapsed().count()));
+        auto elapsed = static_cast<uint64_t>(base_static_vars.timeout_timer.get_elapsed().count());
+        auto delay = static_cast<uint64_t>(static_cast<uint16_t>(static_cast<uint64_t>(timeout_time) * 1000));
+        auto time_left = static_cast<uint8_t>(std::ceil((static_cast<double>(delay) - static_cast<double>(elapsed)) / 1000.));
+        auto pos = ImVec2{static_cast<float>(base_resolution_area.width / 2),static_cast<float>(base_resolution_area.height/10)};
+        auto timeout_text = std::string("Timeout: ") + std::to_string(time_left) + "s";
+        
+        ImGui::PushFont(get_default_font_small());
+        ImGuiUser::draw_info(pos, timeout_text);
+        ImGui::PopFont();
     }
 
     // Draw the FPS/frametime/playtime if wanted
