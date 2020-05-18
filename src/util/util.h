@@ -13,6 +13,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
+#include <random>
 #include "misc/area_size.h"
 
 namespace retrogames
@@ -45,6 +46,27 @@ namespace retrogames
 		*/
 		bool check_aspect_ratio(const area_size_t& size, const uint8_t aspect_x = 16, const uint8_t aspect_y = 9);
 #endif
+
+		/*
+		@brief
+
+			Generates a random number from @min to @max
+
+		@notes
+
+			Taken from https://stackoverflow.com/a/35687575
+			and modified a bit
+		*/
+		template <typename T>
+		T random(T min, T max)
+		{
+			using dist_type = typename std::conditional<std::is_integral<T>::value, std::uniform_int_distribution<T>, std::uniform_real_distribution<T>>::type;
+
+			thread_local static std::mt19937 gen(std::random_device{}());
+    		thread_local static dist_type dist;
+
+			return dist(gen, typename dist_type::param_type{min, max});
+		}
 
 	}
 

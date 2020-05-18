@@ -36,6 +36,13 @@ namespace ImGuiUser
     /*
     @brief
 
+        Draws a slider + input float given the range and description
+    */
+   void inputslider_float(retrogames::cfgvalue_t* cfgvalue, const std::string& name, float max, float min = 0.f, const std::string& desc = "", float scaling = 1.f, float step = 1.f, float step_fast = 2.f, float power = 1.f, const char* format = "%.1f", int decimal_precision = 1);
+
+    /*
+    @brief
+
         Draws a toggle button
     */
     void toggle_button(retrogames::cfgvalue_t* cfgvalue, const std::string& name, const std::string& desc = "");

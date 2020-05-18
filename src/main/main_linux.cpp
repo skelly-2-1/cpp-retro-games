@@ -93,7 +93,7 @@ namespace retrogames
 		if (previous_key_callback != nullptr) previous_key_callback(window, key, scancode, action, mods);
 		if (action != GLFW_PRESS && action != GLFW_RELEASE) return;
 
-		auto found_key = to_imgui_key();
+		auto found_key = to_imgui_key(key);
 
 		if (found_key != static_cast<ImGuiKey>(ImGuiKey_COUNT)) main_handle_key(action == GLFW_PRESS, found_key);
 	}

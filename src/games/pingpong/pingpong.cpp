@@ -12,6 +12,33 @@
 #include "imgui/imgui_user.h"
 #include "misc/macros.h"
 
+namespace retrogames
+{
+
+    namespace detail
+    {
+
+        // turns a difficulty string to an index (DIFFICULTY)
+        auto difficulty_string_to_index = [](std::string difficulty_name) -> retrogames::games::pingpong_t::DIFFICULTY
+        {
+            std::transform(difficulty_name.begin(), difficulty_name.end(), difficulty_name.end(), ::tolower);
+
+            for (uint8_t index = 0; index < static_cast<uint8_t>(retrogames::games::pingpong_t::DIFFICULTY::DIFFICULTY_SIZE); index++)
+            {
+                std::string name = retrogames::games::pingpong_t::get_difficulty_name(static_cast<retrogames::games::pingpong_t::DIFFICULTY>(index));
+                std::transform(name.begin(), name.end(), name.end(), ::tolower);
+
+                if (difficulty_name.compare(name) == 0) return static_cast<retrogames::games::pingpong_t::DIFFICULTY>(index);
+            }
+
+            // default difficulty in case the string wasn't found
+            return retrogames::games::pingpong_t::DIFFICULTY::DIFFICULTY_DEFAULT;
+        };
+
+    }
+
+}
+
 /*
 @brief
 
@@ -24,11 +51,13 @@ retrogames::games::pingpong_t::pingpong_t(settings_t* settings, const std::strin
     cfgvalue_initial_paddle_speed(settings->create("pingpong_initial_paddle_speed", 1000.f)),
     cfgvalue_initial_ball_speed(settings->create("pingpong_initial_ball_speed", 800.f)),
     cfgvalue_ball_scale(settings->create("pingpong_ball_scale", 1.f)),
+    cfgvalue_cpu_difficulty(settings->create("pingpong_cpu_difficulty", get_difficulty_name(DIFFICULTY::DIFFICULTY_DEFAULT))),
     settings(settings),
     left_paddle(nullptr),
     right_paddle(nullptr),
     time_scale(0.1),
-    main_font(nullptr)
+    main_font(nullptr),
+    difficultymanager(nullptr)
 {
     reset(settings, true);
 }
@@ -292,11 +321,10 @@ bool retrogames::games::pingpong_t::draw(bool render)
     static auto set_paddle_direction = [&](paddle_t* paddle, bool move_to_calculated_position) -> void
     {
         set_player_paddle_direction(paddle, paddle->left ? control_keys_e::KEY_W : control_keys_e::KEY_UPARROW, paddle->left ? control_keys_e::KEY_S : control_keys_e::KEY_DOWNARROW);
-
-        if (paddle->is_cpu) set_cpu_paddle_direction(paddle, move_to_calculated_position);
+        set_cpu_paddle_direction(paddle, move_to_calculated_position);
     };
 
-    // Only handle game logic if we're not paused/in timeout/lost focus
+    // Only handle game logic if we're not paused/in timeout
     if (can_continue())
     {
         // store the old ball position
@@ -304,14 +332,22 @@ bool retrogames::games::pingpong_t::draw(bool render)
         ball->old_y = ball->y;
 
         // move the left paddle
-        bool left_paddle_move_to_calculated_position = left_paddle->is_cpu && left_paddle->calculated_y != -1 && !left_paddle->calculated_position_set;
+        bool    left_paddle_move_to_calculated_position =
+                left_paddle->is_cpu &&
+                left_paddle->calculated_y != -1 &&
+                !left_paddle->calculated_position_set &&
+                difficultymanager->get_current_difficulty()->should_paddle_go_to_calculated_position(resolution_area.width, ball->x, true);
 
         set_paddle_direction(left_paddle.get(), left_paddle_move_to_calculated_position);
 
         move_paddle(left_paddle.get(), .5, 1., left_paddle_move_to_calculated_position);
 
         // move the right paddle
-        bool right_paddle_move_to_calculated_position = right_paddle->is_cpu && right_paddle->calculated_y != -1 && !right_paddle->calculated_position_set;
+        bool    right_paddle_move_to_calculated_position =
+                right_paddle->is_cpu &&
+                right_paddle->calculated_y != -1 &&
+                !right_paddle->calculated_position_set &&
+                difficultymanager->get_current_difficulty()->should_paddle_go_to_calculated_position(resolution_area.width, ball->x, false);
 
         set_paddle_direction(right_paddle.get(), right_paddle_move_to_calculated_position);
 
@@ -321,55 +357,71 @@ bool retrogames::games::pingpong_t::draw(bool render)
         auto paddle_hit = move_ball();
 
         // check if we need to calculate the position where the ball will land on the other side
-        if (paddle_hit && ((ball->speed_x > 0./* && right_paddle->is_cpu*/) || (ball->speed_x < 0./* && left_paddle->is_cpu*/)))
+        if (paddle_hit)
         {
             auto target_paddle = ball->speed_x > 0. ? right_paddle.get() : left_paddle.get();
-            auto old_calculated_y = target_paddle->calculated_y;
-            auto old_clamped_calculated_y = target_paddle->calculated_y_clamped;
-            auto old_ball_x = ball->x;
-            auto old_ball_y = ball->y;
-            auto old_ball_speed_x = ball->speed_x;
-            auto old_ball_speed_y = ball->speed_y;
-            auto last_ball_y = ball->y;
 
-            // move the ball until it hits the other side
-            while (true)
+            if (target_paddle->is_cpu)
             {
-                if (move_ball(true))
+                auto current_difficulty = difficultymanager->get_current_difficulty();
+
+                // only calculate if needed
+                if (current_difficulty->calculated_pos_moving_chance > 0.)
                 {
-                    // average it out
-                    target_paddle->calculated_y = (int)((ball->y + last_ball_y) / 2);
+                    auto old_calculated_y = target_paddle->calculated_y;
+                    auto old_clamped_calculated_y = target_paddle->calculated_y_clamped;
+                    auto old_ball_x = ball->x;
+                    auto old_ball_y = ball->y;
+                    auto old_ball_speed_x = ball->speed_x;
+                    auto old_ball_speed_y = ball->speed_y;
+                    auto last_ball_y = ball->y;
 
-                    break;
-                }
+                    // move the ball until it hits the other side
+                    while (true)
+                    {
+                        if (move_ball(true))
+                        {
+                            // average it out
+                            target_paddle->calculated_y = (int)((ball->y + last_ball_y) / 2);
 
-                last_ball_y = ball->y;
-            }
+                            break;
+                        }
 
-            ball->x = old_ball_x;
-            ball->y = old_ball_y;
-            ball->speed_x = old_ball_speed_x;
-            ball->speed_y = old_ball_speed_y;
+                        last_ball_y = ball->y;
+                    }
 
-            if (target_paddle->calculated_y != old_calculated_y)
-            {
-                // clamp the new calculated y
-                auto size = std::ceil(static_cast<double>(target_paddle->size.height) / 2);
+                    ball->x = old_ball_x;
+                    ball->y = old_ball_y;
+                    ball->speed_x = old_ball_speed_x;
+                    ball->speed_y = old_ball_speed_y;
 
-                target_paddle->calculated_y_clamped = std::max(target_paddle->calculated_y, static_cast<int32_t>(size));
-                target_paddle->calculated_y_clamped = std::min(target_paddle->calculated_y_clamped, (static_cast<int32_t>(resolution_area.height) - static_cast<int32_t>(size)) - 1);
+                    if (target_paddle->calculated_y != old_calculated_y)
+                    {
+                        // clamp the new calculated y
+                        auto size = std::ceil(static_cast<double>(target_paddle->size.height) / 2);
 
-                if (target_paddle->calculated_y_clamped != old_clamped_calculated_y)
-                {
-                    // since the position changed, we're no longer in the right position
-                    target_paddle->calculated_position_set = false;
+                        target_paddle->calculated_y_clamped = std::max(target_paddle->calculated_y, static_cast<int32_t>(size));
+                        target_paddle->calculated_y_clamped = std::min(target_paddle->calculated_y_clamped, (static_cast<int32_t>(resolution_area.height) - static_cast<int32_t>(size)) - 1);
+
+                        if (target_paddle->calculated_y_clamped != old_clamped_calculated_y)
+                        {
+                            // since the position changed, we're no longer in the right position
+                            target_paddle->calculated_position_set = false;
+                        }
+                    }
+
+                    // generate new random numbers for the cpu difficulty
+                    current_difficulty->generate_numbers();
+
+                    // set the paddle speed
+                    target_paddle->speed = target_paddle->base_speed_scaled * current_difficulty->current_paddle_speed_multiplier;
                 }
             }
         }
     }
 
     // debugging
-    auto draw_calculated_position = [&](paddle_t* paddle)
+    /*auto draw_calculated_position = [&](paddle_t* paddle)
     {
         if (paddle->calculated_y == -1) return;
 
@@ -383,7 +435,7 @@ bool retrogames::games::pingpong_t::draw(bool render)
     };
 
     draw_calculated_position(left_paddle.get());
-    draw_calculated_position(right_paddle.get());
+    draw_calculated_position(right_paddle.get());*/
 
     // Now moved to base functionality
     /*// draw the playtime
@@ -528,7 +580,31 @@ void retrogames::games::pingpong_t::handle_key(ImGuiKey key, bool pressed)
 */
 void retrogames::games::pingpong_t::draw_options(float scaling)
 {
+    // sliders
+    ImGuiUser::inputslider_float(&cfgvalue_ping_scale_x, "Paddle scale (width)", 5.f, 0.3f, "The paddle width will be scaled by this value.", scaling, .1f, .2f);
+    ImGuiUser::inputslider_float(&cfgvalue_ping_scale_y, "Paddle scale (height)", 5.f, 0.3f, "The paddle height will be scaled by this value.", scaling, .1f, .2f);
+    ImGuiUser::inputslider_float(&cfgvalue_initial_paddle_speed, "Paddle speed", 2000.f, 400.f, "The speed of the paddle.", scaling, .1f, 5.f);
+    ImGuiUser::inputslider_float(&cfgvalue_initial_ball_speed, "Ball speed", 2000.f, 400.f, "The speed of the ball.", scaling, .1f, 5.f);
+    ImGuiUser::inputslider_float(&cfgvalue_ball_scale, "Ball scale", 5.f, 0.3f, "The ball size will be scaled by this value.", scaling, .1f, .2f);
 
+    // combos
+    ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth());
+    ImGui::Separator();
+    ImGui::TextUnformatted("Difficulty:");
+    ImGui::SameLine();
+
+    ImGuiUser::help_marker("The CPU difficulty setting.");
+
+    static auto diff_item = static_cast<int32_t>(detail::difficulty_string_to_index(cfgvalue_cpu_difficulty.get<std::string>()));
+
+    if (ImGui::Combo("##diff", &diff_item, get_difficulty_names(), static_cast<int32_t>(DIFFICULTY::DIFFICULTY_SIZE)))
+    {
+        cfgvalue_cpu_difficulty.set<std::string>(get_difficulty_name(static_cast<DIFFICULTY>(diff_item)));
+
+        //printf("chose: %s - %s\n",get_difficulty_name(static_cast<DIFFICULTY>(diff_item)),settings->get("pingpong_cpu_difficulty").get<std::string>().c_str());
+    }
+
+    ImGui::PopItemWidth();
 }
 
 /*
@@ -549,6 +625,47 @@ void retrogames::games::pingpong_t::reset(settings_t* settings, bool create_font
     if (create_fonts) create_main_font(UI_SCALE);
 
     control_keys.reset();
+
+    // create difficulties if that hasn't happened yet
+    if (difficultymanager == nullptr)
+    {
+        difficultymanager = std::make_unique<difficultymanager_t>(resolution_area.width);
+
+        // easy, set paddle speed to half and disable going to the calculated position entirely
+        difficultymanager->create_difficulty(DIFFICULTY::DIFFICULTY_EASY,
+                                            false, false,
+                                            .5, .8,
+                                            .2, 1.,
+                                            .2);
+        // medium, set paddle speed to half (minimum) and 80% (maximum) and give it a 20% chance to go to the calculated position (but only when 80-90% towards the other side)
+        difficultymanager->create_difficulty(DIFFICULTY::DIFFICULTY_MEDIUM,
+                                            true, true,
+                                            .7, .95,
+                                            .3, .2,
+                                            .5);
+        // hard, set paddle speed to 100% (minimum) and 120% (maximum) and go to the calculated position between 60-70% of the ball getting to the paddle
+        // Also a 95% chance to move to the calculated position when 30-40% within the range of the cpu paddle
+        difficultymanager->create_difficulty(DIFFICULTY::DIFFICULTY_HARD,
+                                            true, true,
+                                            1., 1.2,
+                                            .4, .3,
+                                            .95);
+        // impossible, set the paddle speed to 100% and always go to the calculated position
+        difficultymanager->create_difficulty(DIFFICULTY::DIFFICULTY_IMPOSSIBLE,
+                                            false, false,
+                                            1., 1.,
+                                            0., 0.);
+        // choose the difficulty we want
+        difficultymanager->choose_difficulty(detail::difficulty_string_to_index(cfgvalue_cpu_difficulty.get<std::string>()));
+    }
+    else
+    {
+        // reset screen width
+        difficultymanager->set_screen_width(resolution_area.width);
+
+        // choose the difficulty we want
+        difficultymanager->choose_difficulty(detail::difficulty_string_to_index(cfgvalue_cpu_difficulty.get<std::string>()));
+    }
 }
 
 /*
@@ -558,7 +675,9 @@ void retrogames::games::pingpong_t::reset(settings_t* settings, bool create_font
 */
 void retrogames::games::pingpong_t::draw_controls(float scaling)
 {
-
+    ImGui::BulletText("W/S - Move left paddle");
+    ImGui::BulletText("Arrow up/down - Move right paddle");
+    ImGui::BulletText("Escape - Pause");
 }
 
 /*
@@ -580,7 +699,7 @@ void retrogames::games::pingpong_t::ball_t::draw(void)
 {
     static auto ball_color = color_t(200, 200, 200);
 
-    ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2{static_cast<float>(x), static_cast<float>(y)}, ImVec2{static_cast<float>(x+static_cast<float>(size)),static_cast<float>(y+static_cast<float>(size))}, ImGuiUser::color_to_imgui_color_u32(ball_color));
+    ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2{static_cast<float>(x)-static_cast<float>(size / 2), static_cast<float>(y)-static_cast<float>(size / 2)}, ImVec2{static_cast<float>(x+static_cast<float>(size / 2)),static_cast<float>(y+static_cast<float>(size / 2))}, ImGuiUser::color_to_imgui_color_u32(ball_color));
 }
 
 /*

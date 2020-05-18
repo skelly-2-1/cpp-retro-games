@@ -975,7 +975,9 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 // Combos
                 ImGui::Separator();
 
+#ifndef PLATFORM_NS
                 auto window_bg_color = main_window_bg_color;
+#endif
 
                 ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth());
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, {window_bg_color.x*window_dampening_multiplier,window_bg_color.y*window_dampening_multiplier,window_bg_color.z*window_dampening_multiplier,window_bg_color.w*window_dampening_multiplier});

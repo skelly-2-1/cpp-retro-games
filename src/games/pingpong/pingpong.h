@@ -10,11 +10,13 @@
 
 #include <memory.h>
 #include <random>
+#include <array>
 #include "games/base/base.h"
 #include "misc/area_size.h"
 #include "misc/color.h"
 #include "misc/settings.h"
 #include "misc/timer.h"
+#include "util/util.h"
 
 namespace retrogames
 {
@@ -60,13 +62,231 @@ namespace retrogames
 
             };
 
-            struct difficultymanager_t final
+        public:
+
+            // all of our difficulties (the values have to be defined later)
+            enum class DIFFICULTY
             {
 
-
+                DIFFICULTY_EASY,
+                DIFFICULTY_MEDIUM,
+                DIFFICULTY_HARD,
+                DIFFICULTY_IMPOSSIBLE,
+                DIFFICULTY_SIZE,
+                DIFFICULTY_DEFAULT = DIFFICULTY_IMPOSSIBLE
 
             };
 
+            /*
+            @brief
+
+                Gets all difficulty names
+            */
+            static const char** get_difficulty_names(void)
+            {
+                // names of the difficulties
+                static const char* difficulty_names[static_cast<uint8_t>(DIFFICULTY::DIFFICULTY_SIZE)] = {
+
+                    "Easy",
+                    "Medium",
+                    "Hard",
+                    "Impossible"
+
+                };
+
+                return difficulty_names;
+            }
+
+            /*
+            @brief
+
+                Gets a difficulty name
+            */
+            static const char* get_difficulty_name(DIFFICULTY diff)
+            {
+                return get_difficulty_names()[static_cast<uint8_t>(diff)];
+            }
+
+        private:
+
+            // the values stored in all the difficulties
+            class difficulty_t final
+            {
+
+            protected:
+
+
+
+            private:
+
+                bool go_to_calculated_position; // flag for the chance to move to the calculated position
+
+                std::string name; // name of the difficulty
+
+            public:
+
+                bool enable_paddle_speed_minmax_variance; // enable variance of paddle speed multiplier?
+                bool enable_calculated_pos_minmax_variance; // enable variance of calculated pos multiplier?
+
+                bool is_calculated_pos_multiplier_dynamic; // for outside calculations to check if our calculated pos multiplier is dynamic or not
+                bool is_paddle_speed_multiplier_dynamic; // for outside calculations to check if our paddle speed multiplier is dynamic or not
+
+                double paddle_speed_multiplier_min; // cpu paddle will be scaled by this (minimum)
+                double paddle_speed_multiplier_max; // cpu paddle will be scaled by this (maximum)
+                double min_calculated_pos_multiplier; // example: 0.8 = 80% = Paddle will just go to the calculated position if 80% of the time/distance has been passed
+                double max_calculated_pos_multiplier; // ^
+                double current_paddle_speed_multiplier; // calculated later
+                double current_calculated_pos_multiplier; // calculated later
+                double calculated_pos_moving_chance; // the chance to move to the calculated position at one time
+
+                difficulty_t(   std::string name,
+                                bool enable_paddle_speed_minmax_variance,
+                                bool enable_calculated_pos_minmax_variance,
+                                double paddle_speed_multiplier_min,
+                                double paddle_speed_multiplier_max,
+                                double min_calculated_pos_multiplier,
+                                double max_calculated_pos_multiplier,
+                                double calculated_pos_moving_chance) :
+                                current_calculated_pos_multiplier(0.),
+                                current_paddle_speed_multiplier(1.),
+                                go_to_calculated_position(false),
+                                name(name),
+                                enable_paddle_speed_minmax_variance(enable_paddle_speed_minmax_variance),
+                                enable_calculated_pos_minmax_variance(enable_calculated_pos_minmax_variance),
+                                paddle_speed_multiplier_min(paddle_speed_multiplier_min),
+                                paddle_speed_multiplier_max(paddle_speed_multiplier_max),
+                                min_calculated_pos_multiplier(min_calculated_pos_multiplier),
+                                max_calculated_pos_multiplier(max_calculated_pos_multiplier),
+                                calculated_pos_moving_chance(calculated_pos_moving_chance)
+                {
+                    if (!enable_calculated_pos_minmax_variance && min_calculated_pos_multiplier == max_calculated_pos_multiplier)
+                    {
+                        is_calculated_pos_multiplier_dynamic = false;
+
+                        current_calculated_pos_multiplier = max_calculated_pos_multiplier;
+                    }
+                    else
+                    {
+                        is_calculated_pos_multiplier_dynamic = true;
+                    }
+
+                    if (!enable_paddle_speed_minmax_variance && paddle_speed_multiplier_min == paddle_speed_multiplier_max)
+                    {
+                        is_paddle_speed_multiplier_dynamic = false;
+
+                        current_paddle_speed_multiplier = paddle_speed_multiplier_max;
+                    }
+                    else
+                    {
+                        is_paddle_speed_multiplier_dynamic = true;
+                    }
+                }
+
+                void generate_numbers(void)
+                {
+                    if (!enable_calculated_pos_minmax_variance)
+                    {
+                        current_calculated_pos_multiplier = max_calculated_pos_multiplier;
+                    }
+                    else
+                    {
+                        current_calculated_pos_multiplier = (min_calculated_pos_multiplier != max_calculated_pos_multiplier) ? min_calculated_pos_multiplier + util::random(0., 1.) * (max_calculated_pos_multiplier - min_calculated_pos_multiplier) : max_calculated_pos_multiplier;
+                    }
+
+                    if (!enable_paddle_speed_minmax_variance)
+                    {
+                        current_paddle_speed_multiplier = paddle_speed_multiplier_max;
+                    }
+                    else
+                    {
+                        current_paddle_speed_multiplier = (paddle_speed_multiplier_min != paddle_speed_multiplier_max) ? paddle_speed_multiplier_min + util::random(0., 1.) * (paddle_speed_multiplier_max - paddle_speed_multiplier_min) : paddle_speed_multiplier_max;
+                    }
+
+                    if (calculated_pos_moving_chance < 1.)
+                    {
+                        go_to_calculated_position = util::random(0., 1.) >= 1. - calculated_pos_moving_chance;
+                    }
+                    else if (!go_to_calculated_position)
+                    {
+                        go_to_calculated_position = true;
+                    }
+                }
+
+                bool should_paddle_go_to_calculated_position(uint32_t screen_width, double ball_x, bool left)
+                {
+                    if (!go_to_calculated_position) return false;
+                    if (!is_calculated_pos_multiplier_dynamic && min_calculated_pos_multiplier == 0. && max_calculated_pos_multiplier == 0.) return true;
+
+                    return !left ? (ball_x >= (static_cast<double>(screen_width) * (1. - current_calculated_pos_multiplier))) : (ball_x <= static_cast<double>(screen_width) - (static_cast<double>(screen_width) * (1. - current_calculated_pos_multiplier)));
+                }
+
+            };
+
+            // the class that manages our difficulties
+            class difficultymanager_t final
+            {
+
+            protected:
+
+
+
+            private:
+
+                std::array<std::unique_ptr<difficulty_t>, static_cast<uint8_t>(DIFFICULTY::DIFFICULTY_SIZE)> difficulties;
+
+                DIFFICULTY current_difficulty;
+
+                bool difficulty_set = false;
+
+                uint32_t playable_area_width;
+
+            public:
+
+                void set_screen_width(uint32_t screen_width) { playable_area_width = screen_width; }
+
+                difficultymanager_t(uint32_t screen_width) :
+                    difficulty_set(false),
+                    current_difficulty(DIFFICULTY::DIFFICULTY_IMPOSSIBLE) {}
+
+                void create_difficulty(     DIFFICULTY diff_num,
+                                            bool enable_paddle_speed_minmax_variance,
+                                            bool enable_calculated_pos_minmax_variance,
+                                            double paddle_speed_multiplier_min,
+                                            double paddle_speed_multiplier_max,
+                                            double min_calculated_pos_multiplier,
+                                            double max_calculated_pos_multiplier,
+                                            double calculated_pos_moving_chance = 1.)
+                {
+                    if (static_cast<int32_t>(diff_num) < 0 || static_cast<int32_t>(diff_num) >= static_cast<int32_t>(DIFFICULTY::DIFFICULTY_SIZE)) return;
+
+                    difficulties[static_cast<int32_t>(diff_num)] = std::make_unique<difficulty_t>(  get_difficulty_name(diff_num),
+                                                                                                    enable_paddle_speed_minmax_variance,
+                                                                                                    enable_calculated_pos_minmax_variance,
+                                                                                                    paddle_speed_multiplier_min,
+                                                                                                    paddle_speed_multiplier_max,
+                                                                                                    min_calculated_pos_multiplier,
+                                                                                                    max_calculated_pos_multiplier,
+                                                                                                    calculated_pos_moving_chance);
+                }
+
+                void choose_difficulty(DIFFICULTY diff_num)
+                {
+                    if (static_cast<int32_t>(diff_num) < 0 || static_cast<int32_t>(diff_num) >= static_cast<int32_t>(DIFFICULTY::DIFFICULTY_SIZE)) return;
+
+                    current_difficulty = diff_num;
+                    difficulty_set = true;
+                }
+
+                difficulty_t* get_current_difficulty(void)
+                {
+                    return difficulty_set ? difficulties[static_cast<int8_t>(current_difficulty)].get() : nullptr;
+                }
+
+            };
+
+            std::unique_ptr<difficultymanager_t> difficultymanager;
+
+            // all the info for the ball
             struct ball_t final
             {
 
@@ -78,20 +298,10 @@ namespace retrogames
 
                 void reset(area_size_t resolution_area, uint32_t total_points = 0)
                 {
-                    auto random_number = [](const int32_t& min, const int32_t& max) -> int32_t
-                    {
-                        static std::random_device rd; // obtain a random number from hardware
-                        static std::mt19937 eng(rd()); // seed the generator
+                    x = std::floor(static_cast<double>(resolution_area.width) * .5);
+                    y = std::floor(static_cast<double>(resolution_area.height) * .5);
 
-                        std::uniform_int_distribution<> distr(min, max); // define the range
-
-                        return distr(eng);
-                    };
-
-                    x = std::floor(static_cast<double>(resolution_area.width) * .5 - static_cast<double>(size) * .5);
-                    y = std::floor(static_cast<double>(resolution_area.height) * .5 - static_cast<double>(size) * .5);
-
-                    speed_x = random_number(0, 100) < 50 ? initial_speed + static_cast<double>(total_points) : -initial_speed - static_cast<double>(total_points);
+                    speed_x = util::random(1, 100) < 50 ? initial_speed + static_cast<double>(total_points) : -initial_speed - static_cast<double>(total_points);
                     speed_y = 0.f;
                 }
 
@@ -198,6 +408,7 @@ namespace retrogames
             cfgvalue_t& cfgvalue_initial_paddle_speed;
             cfgvalue_t& cfgvalue_initial_ball_speed;
             cfgvalue_t& cfgvalue_ball_scale;
+            cfgvalue_t& cfgvalue_cpu_difficulty;
 
             double initial_paddle_speed;
             double initial_ball_speed;

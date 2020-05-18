@@ -16,7 +16,7 @@
 
 // If defined and the settings system encounters an error, an error
 // will be spewed instead of just exiting
-//#define SETTINGS_ENABLE_DEBUGGING
+#define SETTINGS_ENABLE_DEBUGGING
 
 #ifdef PLATFORM_NS
 // If defined, software rendering will be used for ImGui (ONLY for the NS) instead of

@@ -627,7 +627,6 @@ retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& nam
     move_counter(0),
     move_eat_counter(0),
     resolution_area(settings->get_main_settings().resolution_area),
-    setting_timeout(settings->create("snake_timeout", 3u)),
     setting_field_size(settings->create("snake_field_size", 10u)),
     setting_speed(settings->create("snake_speed", 10u)),
     snake_fps(static_cast<uint8_t>(setting_speed.get<uint32_t>())),
@@ -992,7 +991,6 @@ void retrogames::games::snake_t::draw_death_menu(void)
 */
 void retrogames::games::snake_t::draw_options(float scaling)
 {
-    ImGuiUser::inputslider_uint32_t(&setting_timeout, "Timeout (in seconds)", 10u, 0u, "How many seconds the game is in timeout when starting or tabbing back into the game.", scaling);
     ImGuiUser::inputslider_uint32_t(&setting_field_size, "Resolution (X2)", 25u, 3u, "How many boxes are in one axis * 2 (x, y) * 2 = games' field resolution.", scaling);
     ImGuiUser::inputslider_uint32_t(&setting_speed, "Speed", 60u, 1u, "How many times the snake moves from one box to another in a single second.", scaling);
 }

@@ -48,7 +48,7 @@ void ImGuiUser::inputslider_uint32_t(retrogames::cfgvalue_t* cfgvalue, const std
 
     auto val = static_cast<int32_t>(cfgvalue->get<uint32_t>());
     auto avail_width = ImGui::GetContentRegionAvailWidth();
-    auto input_width = std::ceil(avail_width / 7.f) * scaling;
+    auto input_width = std::ceil(avail_width / 6.f) * scaling;
 
     ImGui::PushItemWidth(input_width);
     ImGui::InputInt((std::string("##") + name).c_str(), &val);
@@ -64,7 +64,44 @@ void ImGuiUser::inputslider_uint32_t(retrogames::cfgvalue_t* cfgvalue, const std
     val = std::max(val, static_cast<int32_t>(min));
     val = std::min(val, static_cast<int32_t>(max));
 
-    cfgvalue->set<uint32_t>(static_cast<uint32_t>(val));
+    cfgvalue->set(static_cast<uint32_t>(val));
+}
+
+/*
+@brief
+
+    Draws a slider + input float given the range and description
+*/
+void ImGuiUser::inputslider_float(retrogames::cfgvalue_t* cfgvalue, const std::string& name, float max, float min/* = 0.f*/, const std::string& desc/* = ""*/, float scaling/* = 1.f*/, float step/* = 1.f*/, float step_fast/* = 2.f*/, float power/* = 1.f*/, const char* format/* = "%.1f"*/, int decimal_precision/* = 1*/)
+{
+    ImGui::Text("%s:", name.c_str());
+
+    if (!desc.empty())
+    {
+        ImGui::SameLine();
+
+        help_marker(desc);
+    }
+
+    auto val = cfgvalue->get<float>();
+    auto avail_width = ImGui::GetContentRegionAvailWidth();
+    auto input_width = std::ceil(avail_width / 6.f) * scaling;
+
+    ImGui::PushItemWidth(input_width);
+    ImGui::InputFloat((std::string("##") + name).c_str(), &val, step, step_fast, decimal_precision);
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+
+    auto slider_width = ImGui::GetContentRegionAvailWidth();
+
+    ImGui::PushItemWidth(slider_width);
+    ImGui::SliderFloat((std::string("##") + name + "2").c_str(), &val, min, max, format, power);
+    ImGui::PopItemWidth();
+
+    val = std::max(val, min);
+    val = std::min(val, max);
+
+    cfgvalue->set(val);
 }
 
 /*

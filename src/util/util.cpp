@@ -78,7 +78,7 @@ const std::pair<std::vector<std::tuple<uint16_t, uint16_t, uint16_t>>, std::stri
     
     if (tried_finding_resolutions) return supported_resolutions;
 
-    std::unordered_map<std::pair<uint16_t, uint16_t>, std::vector<uint16_t>, detail::hash_pair_t> supported_resolutions_map;
+    std::unordered_map<std::pair<uint16_t, uint16_t>, std::vector<uint16_t>, retrogames::detail::hash_pair_t> supported_resolutions_map;
 
 #ifdef PLATFORM_LINUX
     int mode_count;

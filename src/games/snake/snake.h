@@ -40,7 +40,6 @@ namespace retrogames
         private:
 
             // Settings
-            cfgvalue_t& setting_timeout;
             cfgvalue_t& setting_field_size;
             cfgvalue_t& setting_speed;
 
