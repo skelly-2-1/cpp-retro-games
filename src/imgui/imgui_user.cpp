@@ -11,6 +11,51 @@
 #include "imgui_user.h"
 #include <cmath>
 
+uint8_t ImGuiUser::current_modal_popup_id = 0;
+
+/*
+@brief
+
+    Constructor (from modal_popup_wrapper_t)
+*/
+ImGuiUser::modal_popup_t::modal_popup_t(const char* name, bool darkening/* = false*/) : started_popup(false), darkening(false)
+{
+    // Create a dummy window for the ImGui context (needed when we switch between windowed and fullscreen)
+    // don't ask me why...
+    if (current_modal_popup_id == 0 && !(started_window = ImGui::Begin((std::string("##no") + std::to_string(current_modal_popup_id++)).c_str(), nullptr, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNavFocus))) return;
+
+    if (!(this->darkening = darkening))
+    {
+        ImGui::PushStyleColor(ImGuiCol_ModalWindowDarkening, { 0.f, 0.f, 0.f, 0.f });
+        ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, { 0.f, 0.f, 0.f, 0.f });
+    }
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+    ImGui::OpenPopup(name);
+
+    started_popup = ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize);
+}
+
+/*
+@brief
+
+    Destructor (from modal_popup_wrapper_t)
+*/
+ImGuiUser::modal_popup_t::~modal_popup_t()
+{
+    current_modal_popup_id--;
+
+    if (!started_window) return;
+    if (started_popup) ImGui::EndPopup();
+    if (!darkening) ImGui::PopStyleColor(2);
+
+    ImGui::PopStyleVar(3);
+
+    if (current_modal_popup_id == 0) ImGui::End();
+}
+
 /*
 @brief
 

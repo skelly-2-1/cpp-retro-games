@@ -394,6 +394,8 @@ namespace retrogames
 
             };
 
+            paddle_t* winner_paddle;
+
             std::unique_ptr<paddle_t> left_paddle, right_paddle;
             std::unique_ptr<ball_t> ball, old_ball;
 
@@ -409,6 +411,7 @@ namespace retrogames
             cfgvalue_t& cfgvalue_initial_ball_speed;
             cfgvalue_t& cfgvalue_ball_scale;
             cfgvalue_t& cfgvalue_cpu_difficulty;
+            cfgvalue_t& cfgvalue_max_score;
 
             double initial_paddle_speed;
             double initial_ball_speed;
@@ -416,6 +419,9 @@ namespace retrogames
             double time_scale;
 
             ImFont* main_font;
+
+            bool should_exit;
+            bool confirm_exit_game;
 
             /*
             @brief

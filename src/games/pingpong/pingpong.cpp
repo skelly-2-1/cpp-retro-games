@@ -52,6 +52,7 @@ retrogames::games::pingpong_t::pingpong_t(settings_t* settings, const std::strin
     cfgvalue_initial_ball_speed(settings->create("pingpong_initial_ball_speed", 800.f)),
     cfgvalue_ball_scale(settings->create("pingpong_ball_scale", 1.f)),
     cfgvalue_cpu_difficulty(settings->create("pingpong_cpu_difficulty", get_difficulty_name(DIFFICULTY::DIFFICULTY_DEFAULT))),
+    cfgvalue_max_score(settings->create("pingpong_max_score", 7u)),
     settings(settings),
     left_paddle(nullptr),
     right_paddle(nullptr),
@@ -103,6 +104,8 @@ void retrogames::games::pingpong_t::create_ball(void)
 
     Called from our renderer thread when we need to draw
 */
+#include <Windows.h>
+
 bool retrogames::games::pingpong_t::draw(bool render)
 {
     if (!render) return false;
@@ -186,6 +189,7 @@ bool retrogames::games::pingpong_t::draw(bool render)
                 left_paddle->reset(resolution_area, left_paddle->points);
                 ball->reset(resolution_area, right_paddle->points+left_paddle->points);
 
+                // start timeout
                 start_timeout();
             }
             else if (ball->x + static_cast<double>(std::ceil(ball->size / 2)) >= static_cast<double>(resolution_area.width) - 1.)
@@ -195,6 +199,7 @@ bool retrogames::games::pingpong_t::draw(bool render)
                 right_paddle->reset(resolution_area, right_paddle->points);
                 ball->reset(resolution_area, right_paddle->points+left_paddle->points);
 
+                // start timeout
                 start_timeout();
             }
         }
@@ -324,8 +329,9 @@ bool retrogames::games::pingpong_t::draw(bool render)
         set_cpu_paddle_direction(paddle, move_to_calculated_position);
     };
 
-    // Only handle game logic if we're not paused/in timeout
-    if (can_continue())
+    // only handle game logic if we're not paused/in timeout
+    // and if we don't have a winner yet
+    if (can_continue() && winner_paddle == nullptr)
     {
         // store the old ball position
         ball->old_x = ball->x;
@@ -354,6 +360,8 @@ bool retrogames::games::pingpong_t::draw(bool render)
         move_paddle(right_paddle.get(), .5, 1., right_paddle_move_to_calculated_position);
 
         // move the ball
+        auto old_left_points = left_paddle->points;
+        auto old_right_points = right_paddle->points;
         auto paddle_hit = move_ball();
 
         // check if we need to calculate the position where the ball will land on the other side
@@ -416,6 +424,19 @@ bool retrogames::games::pingpong_t::draw(bool render)
                     // set the paddle speed
                     target_paddle->speed = target_paddle->base_speed_scaled * current_difficulty->current_paddle_speed_multiplier;
                 }
+            }
+        }
+        else
+        {
+            // check if someone won
+            auto is_left = (old_left_points < left_paddle->points);
+
+            if (is_left || old_right_points < right_paddle->points)
+            {
+                auto scored_paddle = is_left ? left_paddle.get() : right_paddle.get();
+                auto max_score = cfgvalue_max_score.get<uint32_t>();
+
+                if (max_score > 0u && scored_paddle->points >= max_score)  winner_paddle = scored_paddle;
             }
         }
     }
@@ -543,7 +564,55 @@ bool retrogames::games::pingpong_t::draw(bool render)
     left_paddle->draw();
     right_paddle->draw();
 
-    return false;
+    // draw the modal for winning
+    if (winner_paddle != nullptr)
+    {
+        dont_draw_pause_menu(); // prevent pause menu from drawing
+
+        IMGUI_MODAL_POPUP(winner, true) // true = with darkening
+        {
+            if (!confirm_exit_game)
+            {
+                auto button_size = ImVec2{ImGui::CalcTextSize("Back to main menu").x+ImGui::GetStyle().FramePadding.x*2.f,0.f};
+
+                ImGui::Text("%s side won!", (winner_paddle->left ? "Left" : "Right"));
+
+                if (ImGui::Button("Restart", button_size))
+                {
+                    // reset the paddles and the ball
+                    left_paddle->points = right_paddle->points = 0;
+                    right_paddle->reset(resolution_area, 0u);
+                    left_paddle->reset(resolution_area, 0u);
+                    ball->reset(resolution_area, 0);
+
+                    // don't ask for a confirm next time someone wins
+                    confirm_exit_game = false;
+
+                    // we have no winner anymore
+                    winner_paddle = nullptr;
+
+                    // start timeout
+                    start_timeout();
+                }
+
+                if (ImGui::Button("Back to main menu", button_size)) confirm_exit_game = true;
+            }
+            else
+            {
+                ImGui::TextUnformatted("Are you sure?");
+
+                auto button_size = ImVec2{((ImGui::CalcTextSize("Are you sure?").x+ImGui::GetStyle().FramePadding.x*2.f)*.5f)-ImGui::GetStyle().ItemInnerSpacing.x*2.f,0.f};
+
+                if (ImGui::Button("Yes", button_size)) should_exit = true;
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("No", button_size)) confirm_exit_game = false;
+            }
+        }
+    }
+
+    return should_exit;
 }
 
 /*
@@ -625,6 +694,10 @@ void retrogames::games::pingpong_t::reset(settings_t* settings, bool create_font
     if (create_fonts) create_main_font(UI_SCALE);
 
     control_keys.reset();
+
+    winner_paddle = nullptr;
+
+    should_exit = confirm_exit_game = false;
 
     // create difficulties if that hasn't happened yet
     if (difficultymanager == nullptr)

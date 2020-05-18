@@ -135,12 +135,20 @@ namespace retrogames
     private:
 
         bool confirming_main_menu;
+        bool do_draw_pause_menu;
 
         PAUSE_STATE pause_state;
 
         area_size_t base_resolution_area;
 
     public:
+
+        /*
+        @brief
+
+            Prevents the pause menu from drawing the current frame
+        */
+        void dont_draw_pause_menu(void) { do_draw_pause_menu = false; }
 
         /*
         @brief

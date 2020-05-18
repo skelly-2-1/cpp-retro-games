@@ -43,12 +43,14 @@ retrogames::game_base_t::playtime_t retrogames::game_base_t::get_playtime_elapse
 */
 bool retrogames::game_base_t::draw_pause_menu(ImFont* font)
 {
+    if (!do_draw_pause_menu) return false;
+
     // Create a dummy window for the ImGui context (needed when we switch between windowed and fullscreen)
     // don't ask me why...
     if (!(ImGui::Begin("##pausedummy", nullptr, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNavFocus))) return false;
 
     // Highlight the first option by default
-    ImGuiContext& g = *ImGui::GetCurrentContext();
+    auto& g = *ImGui::GetCurrentContext();
 
     if (g.CurrentWindow->Appearing)
     {
@@ -197,11 +199,14 @@ bool retrogames::game_base_t::base_draw(bool render)
         if (!base_static_vars.start_timer.started()) base_static_vars.playtime = {};
     }
 
+    // Reset the flag indicating if we want to draw the pause menu
+    do_draw_pause_menu = true;
+
     // Now, do any drawing that we need to do
     auto ret = draw(render);
 
     // Draw the timeout time if we're still in timeout
-    if (base_static_vars.timeout_timer.started() && !paused)
+    if (base_static_vars.timeout_timer.started() && !paused && do_draw_pause_menu)
     {
         auto elapsed = static_cast<uint64_t>(base_static_vars.timeout_timer.get_elapsed().count());
         auto delay = static_cast<uint64_t>(static_cast<uint16_t>(static_cast<uint64_t>(timeout_time) * 1000));

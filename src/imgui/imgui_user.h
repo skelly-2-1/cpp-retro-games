@@ -16,8 +16,66 @@
 #include "misc/cfgvalue.h"
 #include "misc/color.h"
 
+#define IMGUIUSER_CONCAT(a, b) a ## b
+#define IMGUIUSER_WITH(decl)\
+    for (bool __f = true; __f; ) \
+    for (auto decl; __f; __f = false)
+#define IMGUI_MODAL_POPUP(name, ...)\
+    IMGUIUSER_WITH(IMGUIUSER_CONCAT(modal_, name) = ImGuiUser::modal_popup_t(#name, __VA_ARGS__))\
+    if (IMGUIUSER_CONCAT(modal_, name).success())
+
 namespace ImGuiUser
 {
+
+    // Tells us about the current modal popup ID (in case we want to stack them)
+    extern uint8_t current_modal_popup_id;
+
+    /*
+    @brief
+
+        Wrapper for ImGui's modal popups (just makes the code smaller)
+    */
+    struct modal_popup_t final
+    {
+
+        // Did we successfully open the dummy window?
+        bool started_window;
+
+        // Did we successfully open the popup?
+        bool started_popup;
+
+        // Do we want to darken the background?
+        bool darkening;
+
+        /*
+        @brief
+
+            Constructor
+        */
+        modal_popup_t(const char* name, bool darkening = false);
+
+        /*
+        @brief
+
+            Destructor
+        */
+        ~modal_popup_t();
+
+        /*
+        @brief
+
+            Tells the caller if we started the popup successfully or not
+        */
+        bool success(void) const { return started_popup; }
+
+        /*
+        @brief
+
+            Closes the modal popup
+        */
+        void close(void) const { ImGui::CloseCurrentPopup(); }
+
+    };
 
     /*
     @brief
