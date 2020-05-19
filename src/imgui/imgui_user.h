@@ -133,4 +133,11 @@ namespace ImGuiUser
     */
     void draw_info(const ImVec2& pos, std::string info);
 
+    /*
+    @brief
+
+        Highlights the first option on an appearing window
+    */
+    void highlight_first_option_on_appearing(void);
+
 }

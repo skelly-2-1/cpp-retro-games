@@ -9,6 +9,7 @@
 */
 
 #include "imgui_user.h"
+#include "imgui_internal.h"
 #include <cmath>
 
 uint8_t ImGuiUser::current_modal_popup_id = 0;
@@ -263,4 +264,20 @@ void ImGuiUser::draw_info(const ImVec2& pos, std::string info)
 
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(2);
+}
+
+/*
+@brief
+
+    Highlights the first option on an appearing window
+*/
+void ImGuiUser::highlight_first_option_on_appearing(void)
+{
+    auto& g = *ImGui::GetCurrentContext();
+
+    if (g.CurrentWindow->Appearing)
+    {
+        g.NavDisableHighlight = false;
+        g.NavDisableMouseHover = true;
+    }
 }

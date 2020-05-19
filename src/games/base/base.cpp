@@ -45,28 +45,12 @@ bool retrogames::game_base_t::draw_pause_menu(ImFont* font)
 {
     if (!do_draw_pause_menu) return false;
 
-    // Create a dummy window for the ImGui context (needed when we switch between windowed and fullscreen)
-    // don't ask me why...
-    if (!(ImGui::Begin("##pausedummy", nullptr, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNavFocus))) return false;
+    bool result = false;
 
-    // Highlight the first option by default
-    auto& g = *ImGui::GetCurrentContext();
-
-    if (g.CurrentWindow->Appearing)
+    IMGUI_MODAL_POPUP(pausemenu, true)
     {
-        g.NavDisableHighlight = false;
-        g.NavDisableMouseHover = true;
-    }
+        ImGuiUser::highlight_first_option_on_appearing();
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-    ImGui::OpenPopup("Pause menu");
-
-    auto result = false;
-
-    if (ImGui::BeginPopupModal("Pause menu", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize))
-    {
         ImGui::TextUnformatted("Pause menu");
         ImGui::Separator();
 
@@ -89,12 +73,7 @@ bool retrogames::game_base_t::draw_pause_menu(ImFont* font)
 
             if (ImGui::Button("No", button_size)) confirming_main_menu = false;
         }
-
-        ImGui::EndPopup();
     }
-
-    ImGui::PopStyleVar(3);
-    ImGui::End();
 
     return result;
 }

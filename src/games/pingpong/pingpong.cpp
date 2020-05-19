@@ -567,6 +567,7 @@ bool retrogames::games::pingpong_t::draw(bool render)
     // draw the modal for winning
     if (winner_paddle != nullptr)
     {
+        unpause(); // unpause if we're paused
         dont_draw_pause_menu(); // prevent pause menu from drawing
 
         IMGUI_MODAL_POPUP(winner, true) // true = with darkening
@@ -655,6 +656,7 @@ void retrogames::games::pingpong_t::draw_options(float scaling)
     ImGuiUser::inputslider_float(&cfgvalue_initial_paddle_speed, "Paddle speed", 2000.f, 400.f, "The speed of the paddle.", scaling, .1f, 5.f);
     ImGuiUser::inputslider_float(&cfgvalue_initial_ball_speed, "Ball speed", 2000.f, 400.f, "The speed of the ball.", scaling, .1f, 5.f);
     ImGuiUser::inputslider_float(&cfgvalue_ball_scale, "Ball scale", 5.f, 0.3f, "The ball size will be scaled by this value.", scaling, .1f, .2f);
+    ImGuiUser::inputslider_uint32_t(&cfgvalue_max_score, "Max score", 20u, 0u, "The player/cpu that reaches this score wins. 0 means unlimited, no winner.", scaling);
 
     // combos
     ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth());
@@ -783,9 +785,9 @@ void retrogames::games::pingpong_t::ball_t::draw(void)
 void retrogames::games::pingpong_t::paddle_t::draw(void)
 {
     static auto paddle_color = color_t(220, 220, 220);
-    static auto paddle_color_moving_to_position = color_t(220, 50, 50);
+    //static auto paddle_color_moving_to_position = color_t(220, 50, 50);
 
-    auto current_paddle_color = moving_to_calculated_position ? paddle_color_moving_to_position : paddle_color;
+    auto current_paddle_color = /*moving_to_calculated_position ? paddle_color_moving_to_position : */paddle_color;
 
     ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2{static_cast<float>(x), static_cast<float>(y)}, ImVec2{static_cast<float>(x + static_cast<double>(size.width)), static_cast<float>(y + static_cast<double>(size.height))}, ImGuiUser::color_to_imgui_color_u32(current_paddle_color));
 }
