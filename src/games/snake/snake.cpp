@@ -16,17 +16,8 @@
 #include "misc/area_size.h"
 #include "misc/macros.h"
 #include "imgui/imgui_user.h"
-
-// Some defines we'll use
-#define with(decl)\
-    for (bool __f = true; __f; ) \
-    for (decl; __f; __f = false)
-#define modal_popup(args...)\
-    with(auto __modal = modal_popup_t(args))\
-    if (__modal.success())
-
-// Set the current modal popup id to 0
-uint8_t retrogames::games::snake_t::current_modal_popup_id = 0;
+#include "snd/snd.h"
+#include "util/util.h"
 
 /*
 @brief
@@ -37,9 +28,9 @@ bool retrogames::games::snake_t::draw(bool render)
 {
     if (!render) return false;
 
-    // Calculate the space we have available to the right and left of the actual snake playing field.
-    // We have a 16:9 resolution so we won't have a perfect square.
-    // We can use the left and right sides to display some information while playing.
+    // calculate the space we have available to the right and left of the actual snake playing field.
+    // we have a 16:9 resolution so we won't have a perfect square.
+    // we can use the left and right sides to display some information while playing.
     const uint16_t left_right_distance = (static_cast<uint16_t>(resolution_area.width) - static_cast<uint16_t>(resolution_area.height)) / 2;
     const ImVec2 snake_playing_field_position = ImVec2(left_right_distance, 0);
     const ImVec2 snake_playing_field_size = ImVec2(resolution_area.height, resolution_area.height);
@@ -51,7 +42,7 @@ bool retrogames::games::snake_t::draw(bool render)
 
         sprintf(fmt, "##playingfield_%i", id);
 
-        // Create an imgui window at our snake playing field to draw to
+        // create an imgui window at our snake playing field to draw to
         if (no_padding)
         {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -65,20 +56,20 @@ bool retrogames::games::snake_t::draw(bool render)
         ImGui::SetWindowPos(pos, ImGuiCond_Always);
         ImGui::SetWindowSize(size, ImGuiCond_Always);
 
-        // Draw our snake playing field
+        // draw our snake playing field
         func();
 
-        // End the window
+        // end the window
         ImGui::End();
         ImGui::PopStyleColor(3);
 
         if (no_padding) ImGui::PopStyleVar(2);
     };
 
-    // Create an imgui window at our snake playing field to draw to
+    // create an imgui window at our snake playing field to draw to
     imgui_window(true, 0, snake_playing_field_position, snake_playing_field_size, [this]() { draw_field(); }, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs);
 
-    // Create imgui windows for the left/right sides of the window to draw to
+    // create imgui windows for the left/right sides of the window to draw to
     imgui_window(false, 1, ImVec2(0.f, 0.f), ImVec2(static_cast<float>(left_right_distance), resolution_area.height), [this]() { draw_left_window(); });
     imgui_window(false, 2, ImVec2(static_cast<float>(left_right_distance) + snake_playing_field_size.x, 0.f), ImVec2(static_cast<float>(left_right_distance), resolution_area.height), [this]() { draw_right_window(); });
     
@@ -99,19 +90,19 @@ bool retrogames::games::snake_t::draw(bool render)
 */
 void retrogames::games::snake_t::draw_field(void)
 {
-    // Get the window size
+    // get the window size
     auto window_size = ImVec2(resolution_area.height, resolution_area.height);
 
-    // Fill the playing field background
+    // fill the playing field background
     draw_filled_rect(ImVec2(0, 0), window_size, color_t(0, 0, 0));
 
-    // List of parts for the snake, so we can first draw the outline and then the snake on top
+    // list of parts for the snake, so we can first draw the outline and then the snake on top
     static std::deque<std::tuple<ImVec2, color_t, color_t>> parts;
 
-    // Clear the parts list
+    // clear the parts list
     parts.clear();
 
-    // Helper function to add a snake part to the draw list
+    // helper function to add a snake part to the draw list
     static auto add_part = [this](const ImVec2& box_position, const float& offset, const DIRECTION& direction, color_t fill_color, color_t outline_color)
     {
         auto pos = ImVec2(box_position.x * static_cast<float>(box_size), box_position.y * static_cast<float>(box_size));
@@ -127,10 +118,10 @@ void retrogames::games::snake_t::draw_field(void)
 
         if (offset > 0.f)
         {
-            // Now, we can grab the offset with the current direction
+            // now, we can grab the offset with the current direction
             auto calculated_offset = direction_offsets[static_cast<uint8_t>(direction) - 1];
 
-            // Add the scaled direction offset to the pos
+            // add the scaled direction offset to the pos
             pos.x += (calculated_offset.x * static_cast<float>(box_size)) * offset;
             pos.y += (calculated_offset.y * static_cast<float>(box_size)) * offset;
         }
@@ -138,8 +129,8 @@ void retrogames::games::snake_t::draw_field(void)
         parts.push_back(std::make_tuple(pos, fill_color, outline_color));
     };
 
-    // Outline and snake colors
-    // Outline gets changed if we're dead
+    // outline and snake colors
+    // outline gets changed if we're dead
     static auto outline_color_original = color_t(200, 200, 200);
 
     auto outline_color = outline_color_original;
@@ -149,7 +140,7 @@ void retrogames::games::snake_t::draw_field(void)
 
     if (dead)
     {
-        // We died, pulsate the outline color instead (every second)
+        // we died, pulsate the outline color instead (every second)
         auto ms_elapsed = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - death_time).count());
         auto angle = (static_cast<double>(static_cast<double>(ms_elapsed) - std::floor(static_cast<double>(ms_elapsed) / 1000.0) * 1000.0) / 1000.0) * 360.0;
         auto scale = 0.5 + std::sin(angle * 0.0174533) * 0.5; // 0.f to 1.f
@@ -157,7 +148,7 @@ void retrogames::games::snake_t::draw_field(void)
         outline_color = color_t(255 / 2 + static_cast<uint8_t>(scale * (255 / 2)), 0, 0);
     }
 
-    // Draw the valid snake positions
+    // draw the valid snake positions
     auto positions_color = color_t(100, 100, 100, 100);
 
     for (uint32_t i = 1; i < box_amount; i++)
@@ -166,8 +157,8 @@ void retrogames::games::snake_t::draw_field(void)
         draw_line(ImVec2(static_cast<float>(i * box_size), 0.f), ImVec2(static_cast<float>(i * box_size), resolution_area.height), positions_color);
     }
 
-    // Calculate the delay between snake move-frames
-    // Also check if we're able to move or not (not mid-animation)
+    // calculate the delay between snake move-frames
+    // also check if we're able to move or not (not mid-animation)
     float scale = 0.f;
     bool can_move = false;
     {
@@ -185,7 +176,7 @@ void retrogames::games::snake_t::draw_field(void)
         }
     }
 
-    // Move the snake if need be, also remember if we've moved or not (needed later)
+    // move the snake if need be, also remember if we've moved or not (needed later)
     bool moved = false;
 
     if (can_move)
@@ -218,7 +209,7 @@ void retrogames::games::snake_t::draw_field(void)
         scale = 0.f;
     }
 
-    // Move one more time if we died (since we're one frame behind)
+    // move one more time if we died (since we're one frame behind)
     if (static_vars.last_dead_needs_reset)
     {
         static_vars.last_dead = dead;
@@ -246,24 +237,24 @@ void retrogames::games::snake_t::draw_field(void)
         }
     }
 
-    // Add the snake parts
+    // add the snake parts
     for (int32_t i = static_cast<int32_t>(last_position_history.size()); i >= 0; i--)
     {
         auto dir = DIRECTION::SNAKE_DIRECTION_DEFAULT;
 
         if (i == last_position_history.size())
         {
-            // Fill in corners
+            // fill in corners
             if (!last_position_history.empty()) add_part(last_head, 0.f, dir, snake_color, outline_color);
 
-            // Add the head (interpolated)
+            // add the head (interpolated)
             add_part(last_head, static_vars.direction == DIRECTION::SNAKE_DIRECTION_NONE ? 0.f : scale, static_vars.direction, snake_head_color, outline_color);
 
             continue;
         }
         else if (i == 0 && !last_position_history.empty() && move_eat_counter == move_counter)
         {
-            // We've just eaten and this is the tail, smooth out the animation of it popping out.
+            // we've just eaten and this is the tail, smooth out the animation of it popping out.
             ImVec2 next_box_position{}; // One block after our tail
 
             if (last_position_history.size() > 1)
@@ -302,14 +293,14 @@ void retrogames::games::snake_t::draw_field(void)
             else if (next_box_position.y == box_position.y + 1) dir = DIRECTION::SNAKE_DIRECTION_DOWN;
             else if (next_box_position.y == box_position.y - 1) dir = DIRECTION::SNAKE_DIRECTION_UP;
 
-            // To fill in corners (looks kinda trippy otherwise)
+            // to fill in corners (looks kinda trippy otherwise)
             add_part(next_box_position, 0.f, dir, snake_color, outline_color);
         }
 
         add_part(box_position, scale, dir, snake_color, outline_color);
     }
 
-    // Helper function to get outline position and size
+    // helper function to get outline position and size
     const auto get_outline_pos_and_size = [this](const ImVec2& pos) -> std::pair<ImVec2, ImVec2>
     {
         auto _pos = ImVec2(pos.x - 1.f, pos.y - 1.f);
@@ -338,7 +329,7 @@ void retrogames::games::snake_t::draw_field(void)
         return std::make_pair(_pos, size);
     };
 
-    // Helper function to draw an outline
+    // helper function to draw an outline
     const auto draw_outline = [this, get_outline_pos_and_size](const ImVec2& pos, const color_t& color)
     {
         auto _pos = get_outline_pos_and_size(pos);
@@ -346,31 +337,31 @@ void retrogames::games::snake_t::draw_field(void)
         draw_rect(_pos.first, _pos.second, color);
     };
 
-    // Draw foods
+    // draw foods
     static const auto food_color = color_t(200, 0, 0);
 
-    // Outline
+    // outline
     for (const auto& food : foods)
     {
         draw_outline(ImVec2(static_cast<float>(std::get<0>(food) * box_size), static_cast<float>(std::get<1>(food) * box_size)), outline_color_original);
     }
 
-    // Fill
+    // fill
     for (const auto& food : foods)
     {
         draw_filled_rect(ImVec2(static_cast<float>(std::get<0>(food) * box_size), static_cast<float>(std::get<1>(food) * box_size)), ImVec2(static_cast<float>(box_size), static_cast<float>(box_size)), food_color);
     }
 
-    // Cached foods (to smooth out the animation of eating the food)
+    // cached foods (to smooth out the animation of eating the food)
     if (!cached_foods.empty())
     {
-        // Outline
+        // outline
         for (const auto& food : cached_foods)
         {
             draw_outline(ImVec2(static_cast<float>(std::get<0>(food) * box_size), static_cast<float>(std::get<1>(food) * box_size)), outline_color_original);
         }
 
-        // Fill
+        // fill
         for (auto it = cached_foods.begin(); it != cached_foods.end();)
         {
             auto food = *it;
@@ -388,13 +379,13 @@ void retrogames::games::snake_t::draw_field(void)
         }
     }
 
-    // List of outer snake parts, due to our rendering method we have to fix the outside of
+    // list of outer snake parts, due to our rendering method we have to fix the outside of
     // the playing field not flashing red when dying. We do that with this.
     static std::vector<std::pair<uint16_t, uint16_t>> outside_parts;
 
     outside_parts.clear();
 
-    // Draw the snake outline
+    // draw the snake outline
     for (const auto& part : parts)
     {
         const auto& pos = std::get<0>(part);
@@ -402,7 +393,7 @@ void retrogames::games::snake_t::draw_field(void)
 
         draw_outline(pos, outline_color);
 
-        // Check if we have an outside snake part if we're dead (due to the rendering order)
+        // check if we have an outside snake part if we're dead (due to the rendering order)
         if (dead)
         {
             const auto outside_pos = static_cast<float>(box_size) * (static_cast<float>(box_amount) - 1.f);
@@ -411,7 +402,7 @@ void retrogames::games::snake_t::draw_field(void)
         }
     }
 
-    // Fill in the snake
+    // fill in the snake
     for (const auto& part : parts)
     {
         const auto& pos = std::get<0>(part);
@@ -420,10 +411,10 @@ void retrogames::games::snake_t::draw_field(void)
         draw_filled_rect(pos, ImVec2(static_cast<float>(box_size), static_cast<float>(box_size)), fill_color);
     }
     
-    // Draw the field outline
+    // draw the field outline
     draw_rect(ImVec2(0.f, 0.f), window_size, outline_color_original);
 
-    // Replace parts of the field outline with flashing red if we died
+    // replace parts of the field outline with flashing red if we died
     if (!outside_parts.empty())
     {
         for (const auto& pos : outside_parts)
@@ -439,7 +430,7 @@ void retrogames::games::snake_t::draw_field(void)
         }
     }
 
-    // If the player is dead, draw the death menu
+    // if the player is dead, draw the death menu
     // and if the game is paused, draw a pause menu
     if (dead) draw_death_menu();
 }
@@ -490,20 +481,20 @@ void retrogames::games::snake_t::handle_key(ImGuiKey key, bool pressed)
 {
     if (!pressed) return;
 
-    // Escape (un)pauses the game
+    // escape toggles pause
     if (key == ImGuiKey_Escape && !dead) hit_pause = true;
     if (is_paused() || (!is_paused() && hit_pause)) return;
 
-    // Helper function to add a direction to our direction stack (thread-safe)
+    // helper function to add a direction to our direction stack (thread-safe)
     static auto add_direction = [this](DIRECTION dir)
     {
-        // Determine the current direction
+        // determine the current direction
         auto current_dir = force_direction == DIRECTION::SNAKE_DIRECTION_NONE ? direction_stack.at(0) : force_direction;
 
-        // Already set
+        // already set
         if (dir == current_dir) return;
 
-        // Check if it goes against itself
+        // check if it goes against itself
         if ((dir == DIRECTION::SNAKE_DIRECTION_RIGHT && current_dir == DIRECTION::SNAKE_DIRECTION_LEFT ||
             dir == DIRECTION::SNAKE_DIRECTION_LEFT && current_dir == DIRECTION::SNAKE_DIRECTION_RIGHT ||
             dir == DIRECTION::SNAKE_DIRECTION_UP && current_dir == DIRECTION::SNAKE_DIRECTION_DOWN ||
@@ -512,34 +503,34 @@ void retrogames::games::snake_t::handle_key(ImGuiKey key, bool pressed)
             if (!position_history.empty()) return;
         }
 
-        // All good, add the direction to our stack
+        // all good, add the direction to our stack
         direction_stack.push_back(dir);
 
-        // We can now reset the force direction because we have a stack
+        // we can now reset the force direction because we have a stack
         force_direction = DIRECTION::SNAKE_DIRECTION_NONE;
     };
 
     switch (key)
     {
-		case ImGuiKey_LeftArrow:
+		case ImGuiKey_LeftArrow: case ImGuiKey_A:
 		{
 			add_direction(DIRECTION::SNAKE_DIRECTION_LEFT);
 
 			break;
 		}
-		case ImGuiKey_RightArrow:
+		case ImGuiKey_RightArrow: case ImGuiKey_D:
 		{
 			add_direction(DIRECTION::SNAKE_DIRECTION_RIGHT);
 
 			break;
 		}
-		case ImGuiKey_UpArrow:
+		case ImGuiKey_UpArrow: case ImGuiKey_W:
 		{
 			add_direction(DIRECTION::SNAKE_DIRECTION_UP);
 
 			break;
 		}
-		case ImGuiKey_DownArrow:
+		case ImGuiKey_DownArrow: case ImGuiKey_S:
 		{
 			add_direction(DIRECTION::SNAKE_DIRECTION_DOWN);
 
@@ -571,44 +562,44 @@ void retrogames::games::snake_t::kill(void)
 */
 void retrogames::games::snake_t::do_reset(void)
 {
-    // Reset the direction
+    // reset the direction
     {
-        // Force another direction
+        // force another direction
         force_direction = DIRECTION::SNAKE_DIRECTION_DEFAULT;
 
-        // Clear the direction stack
+        // clear the direction stack
         direction_stack.clear();
     }
 
-    // Clear the position history
+    // clear the position history
     position_history.clear();
     last_position_history.clear();
 
-    // Set the head position to the middle
+    // set the head position to the middle
     head.x = head.y = last_head.x = last_head.y = static_cast<float>(box_amount / 2);
 
-    // Reset the position states
+    // reset the position states
     std::memset(&positions.at(0, 0), static_cast<int32_t>(POSITION_STATE::POSITION_STATE_NOTHING), positions.size());
 
-    // Set the heads' snake position state
+    // set the heads' snake position state
     positions.at(static_cast<uint64_t>(head.x), static_cast<uint64_t>(head.y)) = POSITION_STATE::POSITION_STATE_SNAKE;
 
-    // We didn't die yet
+    // we didn't die yet
     dead = false;
 
-    // Didn't hit false
+    // didn't hit false
     hit_pause = false;
 
-    // And finally, reset our fps manager
+    // and finally, reset our fps manager
     fpsmanager.reset();
 
-    // No foods anymore
+    // no foods anymore
     foods.clear();
 
-    // Didn't move yet
+    // didn't move yet
     move_counter = move_eat_counter = 0;
 
-    // We just started
+    // we just started
     just_started = true;
 }
 
@@ -637,19 +628,19 @@ retrogames::games::snake_t::snake_t(settings_t* settings, const std::string& nam
     resolution = static_cast<uint16_t>(resolution_area.height);
     box_size = static_cast<float>(resolution) / (static_cast<float>(setting_field_size.get<uint32_t>() * 2));
 
-    // Set the head position to the middle
+    // set the head position to the middle
     head.x = head.y = last_head.x = last_head.y = static_cast<float>(box_amount / 2);
 
-    // Set the heads' snake position state
+    // set the heads' snake position state
     positions.at(static_cast<uint64_t>(head.x), static_cast<uint64_t>(head.y)) = POSITION_STATE::POSITION_STATE_SNAKE;
 
-    // We didn't die yet
+    // we didn't die yet
     dead = false;
 
-    // Reset the direction (default)
+    // reset the direction (default)
     force_direction = DIRECTION::SNAKE_DIRECTION_DEFAULT;
 
-    // Set the ImGui style we want
+    // set the ImGui style we want
     auto& style = ImGui::GetStyle();
 
     style.Colors[ImGuiCol_Button] = { 0.f, 0.f, 0.f, 0.f };
@@ -674,31 +665,34 @@ retrogames::games::snake_t::~snake_t()
 */
 void retrogames::games::snake_t::eat(void)
 {
-    // We just ate (@move() will make use of this)
+    // play the eat sound
+    snd->play_sound(snd_t::sounds_e::SOUND_EAT);
+
+    // we just ate (@move() will make use of this)
     eaten = true;
 
-    // Also set this in order to smooth out the animation of the tail growing
+    // also set this in order to smooth out the animation of the tail growing
     move_eat_counter = move_counter;
 
-    // Remove the food from our list
+    // remove the food from our list
     if (foods.empty()) return;
 
-	// Create a new element
+	// create a new element
     generate_food();
 
-	// Find the entry
+	// find the entry
     auto it = std::find_if(foods.begin(), foods.end(), [this](const food_type& tuple) -> bool
     {
         return std::get<0>(tuple) == head.x && std::get<1>(tuple) == head.y;
     });
 
-    // Check if we found it
+    // check if we found it
     if (it == foods.end()) return;
 
-	// Add it to the cached food list (to smooth out the animation of eating the food)
+	// add it to the cached food list (to smooth out the animation of eating the food)
     cached_foods.push_back(std::make_tuple(std::get<0>(*it), std::get<1>(*it), move_counter));
 
-    // Remove the element
+    // remove the element
     foods.erase(it);
 }
 
@@ -709,15 +703,15 @@ void retrogames::games::snake_t::eat(void)
 */
 retrogames::games::snake_t::DIRECTION retrogames::games::snake_t::think(void)
 {
-    // Check for timeout
+    // check for timeout
     if (is_in_timeout()) return DIRECTION::SNAKE_DIRECTION_NONE;
 
-    // Check if we want to move our snake. We don't want to do that every frame
+    // check if we want to move our snake. We don't want to do that every frame
     // (60 moves a second would be too fast)
-    // Also check if we're dead, the game is paused or we're in the start timeout
+    // also check if we're dead, the game is paused or we're in the start timeout
     if (!fpsmanager.should_run() || dead || is_paused()) return DIRECTION::SNAKE_DIRECTION_NONE;
 
-    // If we just started, generate food
+    // if we just started, generate food
     if (just_started)
     {
         generate_food();
@@ -725,27 +719,27 @@ retrogames::games::snake_t::DIRECTION retrogames::games::snake_t::think(void)
         just_started = false;
     }
 
-    // Determine the direction
+    // determine the direction
     auto direction = (force_direction == DIRECTION::SNAKE_DIRECTION_NONE) ? direction_stack.at(0) : force_direction;
 
-    // Remove the direction from our stack if need be
+    // remove the direction from our stack if need be
     if (force_direction == DIRECTION::SNAKE_DIRECTION_NONE)
     {
-        // We have a stack, remove an element
+        // we have a stack, remove an element
         direction_stack.erase(direction_stack.begin());
 
-        // If the direction stack is empty, set the force direction to
+        // if the direction stack is empty, set the force direction to
         // the newest element in the stack.
         if (direction_stack.empty()) force_direction = direction;
     }
 
-    // Move the snake
+    // move the snake
     if (move(direction))
     {
-        // We died. Shame.
+        // we died. Shame.
         kill();
 
-        // Remove the last element from our last_position array (would extend our tail otherwise on death by one)
+        // remove the last element from our last_position array (would extend our tail otherwise on death by one)
         if (!last_position_history.empty()) last_position_history.erase(last_position_history.begin());
     }
 
@@ -760,38 +754,38 @@ retrogames::games::snake_t::DIRECTION retrogames::games::snake_t::think(void)
 */
 bool retrogames::games::snake_t::move(const DIRECTION dir)
 {
-    // Add the current position to the position history
+    // add the current position to the position history
     position_history.push_back(std::make_pair(static_cast<uint16_t>(head.x), static_cast<uint16_t>(head.y)));
 
-    // Add the last position to the position history
+    // add the last position to the position history
     last_position_history.push_back(std::make_pair(static_cast<uint16_t>(last_head.x), static_cast<uint16_t>(last_head.y)));
 
-    // Helper function to check if the current head + offset would mean that we die
+    // helper function to check if the current head + offset would mean that we die
     static auto check_death = [this](ImVec2 offset)
     {
-        // Calculate the new position
+        // calculate the new position
         auto new_pos = ImVec2(head.x + offset.x, head.y + offset.y);
 
-        // Check if we're now out of bounds
+        // check if we're now out of bounds
         if (new_pos.x < 0.f || new_pos.y < 0.f ||
             new_pos.x >= static_cast<float>(box_amount) || new_pos.y >= static_cast<float>(box_amount)) return true;
 
-        // Check if we've hit our own snake
+        // check if we've hit our own snake
         if (positions.at(static_cast<uint64_t>(new_pos.x), static_cast<uint64_t>(new_pos.y)) == POSITION_STATE::POSITION_STATE_SNAKE) return true;
 
-        // All good!
+        // all good!
         return false;
     };
 
     /*
-    Enum implemented like this (after NONE):
+        enum implemented like this (after NONE):
 
         SNAKE_DIRECTION_UP,
         SNAKE_DIRECTION_DOWN,
         SNAKE_DIRECTION_LEFT,
         SNAKE_DIRECTION_RIGHT
 
-        So, to get an offset, we can just do:
+        so, to get an offset, we can just do:
     */
     static std::array<ImVec2, 4> direction_offsets = {
 
@@ -802,48 +796,48 @@ bool retrogames::games::snake_t::move(const DIRECTION dir)
 
     };
 
-    // Now, we can grab the offset with the current direction
+    // now, we can grab the offset with the current direction
     auto offset = direction_offsets[static_cast<uint8_t>(dir) - 1];
 
-    // Check if we would die by moving by our offset
+    // check if we would die by moving by our offset
     if (check_death(offset)) return true;
 
-    // Save the last head position
+    // save the last head position
     last_head = head;
 
-    // Add the offset to the head
+    // add the offset to the head
     head.x += offset.x;
     head.y += offset.y;
 
-    // We've moved!
+    // we've moved!
     move_counter++;
 
-    // Check if we hit a food block
+    // check if we hit a food block
     auto& pos = positions.at(static_cast<uint16_t>(head.x), static_cast<uint16_t>(head.y));
 
     if (pos == POSITION_STATE::POSITION_STATE_FOOD) eat();
 
-    // Snake didn't die, remove the last position
+    // snake didn't die, remove the last position
     {
         const auto& last_pos = position_history[0];
 
         if (!eaten)
         {
-            // We haven't eaten, remove one block from our tail
+            // we haven't eaten, remove one block from our tail
             positions.at(last_pos.first, last_pos.second) = POSITION_STATE::POSITION_STATE_NOTHING;
 
-            // Remove the last element from the history since it's now invalid
+            // remove the last element from the history since it's now invalid
             position_history.erase(position_history.begin());
             last_position_history.erase(last_position_history.begin());
         }
         else
         {
-            // We've eaten, don't remove a block from our tail (tail will grow by one block)
+            // we've eaten, don't remove a block from our tail (tail will grow by one block)
             eaten = false;
         }
     }
 
-    // Set the new position to be part of the snake
+    // set the new position to be part of the snake
     pos = POSITION_STATE::POSITION_STATE_SNAKE;
 
     return false;
@@ -869,7 +863,7 @@ void retrogames::games::snake_t::draw_left_window(void)
         time_survived = get_playtime();
     }
 
-    // Display the score
+    // display the score
     ImGui::Text("Score: %i", static_cast<int32_t>(position_history.size()));
 }
 
@@ -887,56 +881,13 @@ void retrogames::games::snake_t::draw_right_window(void)
 /*
 @brief
 
-    Constructor (from modal_popup_wrapper_t)
-*/
-retrogames::games::snake_t::modal_popup_t::modal_popup_t(const char* name, bool darkening/* = false*/) : started_popup(false), darkening(false)
-{
-    // Create a dummy window for the ImGui context (needed when we switch between windowed and fullscreen)
-    // don't ask me why...
-    if (!(started_window = ImGui::Begin((std::string("##no") + std::to_string(current_modal_popup_id++)).c_str(), nullptr, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove))) return;
-
-    if (!(this->darkening = darkening))
-    {
-        ImGui::PushStyleColor(ImGuiCol_ModalWindowDarkening, { 0.f, 0.f, 0.f, 0.f });
-        ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, { 0.f, 0.f, 0.f, 0.f });
-    }
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-    ImGui::OpenPopup(name);
-
-    started_popup = ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
-}
-
-/*
-@brief
-
-    Destructor (from modal_popup_wrapper_t)
-*/
-retrogames::games::snake_t::modal_popup_t::~modal_popup_t()
-{
-    current_modal_popup_id--;
-
-    if (!started_window) return;
-    if (started_popup) ImGui::EndPopup();
-    if (!darkening) ImGui::PopStyleColor(2);
-
-    ImGui::PopStyleVar(4);
-    ImGui::End();
-}
-
-/*
-@brief
-
     Draws the death menu
 */
 void retrogames::games::snake_t::draw_death_menu(void)
 {
     auto& colors = ImGui::GetStyle().Colors;
 
-    modal_popup("##deathmenu")
+    IMGUI_MODAL_POPUP(deathmenu, true)
     {
         if (death_state == DEATH_STATE::DEATH_STATE_MAIN)
         {
@@ -948,23 +899,23 @@ void retrogames::games::snake_t::draw_death_menu(void)
 
             if (ImGui::Button("Retry", button_size))
             {
-                // Reset all variables in case we've already played
+                // reset all variables in case we've already played
                 do_reset();
 
-                // Time out again
+                // time out again
                 start_timeout();
 
-                // Reset the playtime
+                // reset the playtime
                 reset_playtime();
 
-                ImGui::CloseCurrentPopup();
+                modal_deathmenu.close();
             }
 
             if (ImGui::Button("Back to main menu", button_size))
             {
                 death_state = DEATH_STATE::DEATH_STATE_CONFIRM_CLOSE;
 
-                ImGui::CloseCurrentPopup();
+                modal_deathmenu.close();
             }
         }
         else
@@ -973,7 +924,7 @@ void retrogames::games::snake_t::draw_death_menu(void)
 
             if (ImGui::Button("Yes", ImVec2(65.f, 0.)))
             {
-                // Close the game
+                // close the game
                 should_exit = true;
             }
 
@@ -1002,21 +953,11 @@ void retrogames::games::snake_t::draw_options(float scaling)
 */
 void retrogames::games::snake_t::generate_food(void)
 {
-    auto random_number = [](const int32_t& min, const int32_t& max) -> int32_t
-    {
-        static std::random_device rd; // obtain a random number from hardware
-        static std::mt19937 eng(rd()); // seed the generator
-
-        std::uniform_int_distribution<> distr(min, max); // define the range
-
-        return distr(eng);
-    };
-
     //for (uint64_t tries = 0;; tries++)
     while (true)
     {
-        auto x = random_number(0, box_amount - 1);
-        auto y = random_number(0, box_amount - 1);
+        auto x = util::random(0u, box_amount - 1);
+        auto y = util::random(0u, box_amount - 1);
 
         auto& pos = positions.at(static_cast<uint64_t>(x), static_cast<uint64_t>(y));
 
@@ -1037,7 +978,7 @@ void retrogames::games::snake_t::generate_food(void)
 */
 void retrogames::games::snake_t::reset(settings_t* settings, bool create_fonts)
 {
-    // Reset everything that has to do with video settings
+    // reset everything that has to do with video settings
     resolution_area = settings->get_main_settings().resolution_area;
     resolution = static_cast<uint16_t>(resolution_area.height);
     box_size = static_cast<float>(resolution) / (static_cast<float>(setting_field_size.get<uint32_t>() * 2));
@@ -1046,14 +987,14 @@ void retrogames::games::snake_t::reset(settings_t* settings, bool create_fonts)
     box_amount = setting_field_size.get<uint32_t>() * 2;
     positions = unique_ptr_array_matrix_t<POSITION_STATE>(setting_field_size.get<uint32_t>() * 2, setting_field_size.get<uint32_t>() * 2);
 
-    // Misc
+    // misc
     death_state = DEATH_STATE::DEATH_STATE_MAIN;
     should_exit = false;
     hit_pause = false;
     move_counter = 0;
     move_eat_counter = 0;
 
-    // Now do a full reset of everything else
+    // now do a full reset of everything else
     do_reset();
 
     static_vars.reset();

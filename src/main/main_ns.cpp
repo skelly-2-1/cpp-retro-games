@@ -21,6 +21,7 @@
 #include "misc/macros.h"
 #include "misc/trace.h"
 #include "main/main.h"
+#include "snd/snd.h"
 
 // NXLINK support
 #ifdef NS_ENABLE_NXLINK
@@ -61,6 +62,9 @@ extern "C" void userAppExit()
 
 namespace retrogames
 {
+
+	// see snd/snd.h
+	snd_t* snd = nullptr;
 
     // Variables
 	std::unique_ptr<imgui_wrapper_opengl_t> imgui = nullptr;
@@ -128,6 +132,18 @@ void retrogames::main(void)
 	settings_t settings("cpp-retro-games\\settings.json");
 
 	auto& main_settings = settings.get_main_settings();
+
+    // load the sound library
+	snd_t _snd;
+
+	if (!_snd.initialize())
+	{
+		TRACE("Failed to load sound library");
+
+		return;
+	}
+
+	snd = &_snd;
 
 	// Create the config directory if it doesn't exist
 	mkdir("cpp-retro-games", 0777);

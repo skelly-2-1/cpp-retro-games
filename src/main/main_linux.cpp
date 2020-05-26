@@ -16,9 +16,13 @@
 #include "imgui_wrappers/glfw/glfw.h"
 #include "imgui/imgui.h"
 #include "main.h"
+#include "snd/snd.h"
 
 namespace retrogames
 {
+
+	// see snd/snd.h
+	snd_t* snd = nullptr;
 
     // Variables
 	std::unique_ptr<imgui_wrapper_glfw_t> imgui = nullptr;
@@ -30,7 +34,7 @@ namespace retrogames
 
         Main entry point of our program (within the retrogames namespace)
     */
-   void main(void);
+   	void main(void);
 
 	/*
 	@brief
@@ -123,6 +127,18 @@ void retrogames::main(void)
 	settings_t settings("settings.json");
 
 	auto& main_settings = settings.get_main_settings();
+
+	// load the sound library
+	snd_t _snd;
+
+	if (!_snd.initialize())
+	{
+		fprintf(stderr, "Failed to initialize sound library\n");
+
+		return;
+	}
+
+	snd = &_snd;
 
 	// Grab the main settings
 	auto vsync = main_settings.vsync->get<bool>();

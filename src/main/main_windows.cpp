@@ -19,9 +19,13 @@
 #include "imgui/imgui.h"
 #include "main.h"
 #include "util/util.h"
+#include "snd/snd.h"
 
 namespace retrogames
 {
+
+	// see snd/snd.h
+	snd_t* snd = nullptr;
 
     // Needs to be global because of @window_procedure below otherwise not having access to it
 	std::unique_ptr<imgui_wrapper_dx_t> imgui = nullptr;
@@ -155,6 +159,18 @@ void retrogames::main(void)
 
 	auto& main_settings = settings.get_main_settings();
 
+	// load the sound library
+	snd_t _snd;
+
+	if (!_snd.initialize())
+	{
+		MessageBoxA(nullptr, "Failed to initialize sound library", "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
+
+		return;
+	}
+
+	snd = &_snd;
+
 	// Grab the wanted resolution from our settings
 	auto resolution = main_settings.resolution_area;
 
@@ -171,7 +187,7 @@ void retrogames::main(void)
 
 	if (!imgui->initialize(true, &error, window_procedure))
 	{
-		MessageBoxA(NULL, (std::string("Failed to initialize DirectX9. Terminating process.\n\nError: ") + error).c_str(), "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
+		MessageBoxA(nullptr, (std::string("Failed to initialize DirectX9. Terminating process.\n\nError: ") + error).c_str(), "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
 
 		return;
 	}
@@ -179,23 +195,13 @@ void retrogames::main(void)
 	// Attempt to initialize ImGui
 	if (!imgui->initialize(false, &error))
 	{
-		MessageBoxA(NULL, (std::string("Failed to initialize DirectX. Terminating process.\n\nError: ") + error).c_str(), "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
+		MessageBoxA(nullptr, (std::string("Failed to initialize DirectX. Terminating process.\n\nError: ") + error).c_str(), "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
 
 		return;
 	}
 
 	// Retrieve the window for own use
 	auto window = imgui->get_window();
-
-	/*// Get the desktop resolution
-	MONITORINFO monitorInfo = { 0 };
-    monitorInfo.cbSize = sizeof(MONITORINFO);
-    GetMonitorInfo(MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY), &monitorInfo);
-
-	MessageBoxA(nullptr, (	std::string("left: ") + std::to_string(monitorInfo.rcMonitor.left) + "\n" +
-						std::string("right: ") + std::to_string(monitorInfo.rcMonitor.right) + "\n" +
-						std::string("top: ") + std::to_string(monitorInfo.rcMonitor.top) + "\n" +
-						std::string("bottom: ") + std::to_string(monitorInfo.rcMonitor.bottom)).c_str(), "desktop resolution", 0);*/
 
 	// Tell our window that imgui has been initialized
 	imgui_initialized = true;

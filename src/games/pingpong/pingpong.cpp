@@ -11,6 +11,7 @@
 #include "pingpong.h"
 #include "imgui/imgui_user.h"
 #include "misc/macros.h"
+#include "snd/snd.h"
 
 namespace retrogames
 {
@@ -104,8 +105,6 @@ void retrogames::games::pingpong_t::create_ball(void)
 
     Called from our renderer thread when we need to draw
 */
-#include <Windows.h>
-
 bool retrogames::games::pingpong_t::draw(bool render)
 {
     if (!render) return false;
@@ -425,6 +424,9 @@ bool retrogames::games::pingpong_t::draw(bool render)
                     target_paddle->speed = target_paddle->base_speed_scaled * current_difficulty->current_paddle_speed_multiplier;
                 }
             }
+
+            // play ding sound
+            snd->play_sound(snd_t::sounds_e::SOUND_DING);
         }
         else
         {

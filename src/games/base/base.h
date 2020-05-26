@@ -190,7 +190,7 @@ namespace retrogames
 
             Pauses the game
         */
-        void pause(void) { paused = true; }
+        void pause(void);
 
         /*
         @brief
@@ -207,7 +207,17 @@ namespace retrogames
 
             Toggles pause
         */
-        void toggle_pause(void) { paused = !paused; }
+        void toggle_pause(void)
+        {
+            if (paused)
+            {
+                unpause();
+            }
+            else
+            {
+                pause();
+            }
+        }
 
         /*
         @brief

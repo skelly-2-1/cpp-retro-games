@@ -3,6 +3,7 @@
       {
         "name": "Linux",
         "includePath": [
+          "${SFML_DIR}include",
           "${workspaceFolder}/**",
           "/usr/include/**",
           "/usr/local/include/**",

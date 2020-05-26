@@ -73,7 +73,7 @@ namespace retrogames
                 DIFFICULTY_HARD,
                 DIFFICULTY_IMPOSSIBLE,
                 DIFFICULTY_SIZE,
-                DIFFICULTY_DEFAULT = DIFFICULTY_IMPOSSIBLE
+                DIFFICULTY_DEFAULT = DIFFICULTY_HARD
 
             };
 

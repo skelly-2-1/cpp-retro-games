@@ -43,49 +43,6 @@ namespace retrogames
             cfgvalue_t& setting_field_size;
             cfgvalue_t& setting_speed;
 
-            // Tells us about the current modal popup ID (in case we want to stack them)
-            static uint8_t current_modal_popup_id;
-
-            /*
-            @brief
-
-                Wrapper for ImGui's modal popups (just makes the code smaller)
-            */
-            struct modal_popup_t final
-            {
-
-                // Did we successfully open the dummy window?
-                bool started_window;
-
-                // Did we successfully open the popup?
-                bool started_popup;
-
-                // Do we want to darken the background?
-                bool darkening;
-
-                /*
-                @brief
-
-                    Constructor
-                */
-                modal_popup_t(const char* name, bool darkening = false);
-
-                /*
-                @brief
-
-                    Destructor
-                */
-                ~modal_popup_t();
-
-                /*
-                @brief
-
-                    Tells the caller if we started the popup successfully or not
-                */
-                bool success(void) const { return started_popup; }
-
-            };
-
             // Tells us about the current state of the death menu
             enum class DEATH_STATE : uint8_t
             {

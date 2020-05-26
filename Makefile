@@ -139,6 +139,9 @@ else
 		# include necessary libraries (opengl, glfw, etc.)
 		LDLIBS += -lGL -lGLEW -lglfw3 -ldl -lX11 -lpthread
 	endif
+
+	# include SFML audio library
+	LDLIBS += -lsfml-audio
 endif
 
 # set our target
@@ -160,6 +163,7 @@ $(TARGET): $(OBJ_FILES)
 	@echo building ... $(TARGET)
 	@$(CXX) $(LDFLAGS) $(OBJ_FILES) $(LDPATHS) $(LDLIBS) -o $@
 	@echo built ... $(TARGET)
+	@cp -r dep/$(PLATFORM_NAME)/* $(BUILD_DIR)/$(PLATFORM_NAME)
 
 # object files (ns)
 $(OBJ_DIR)/ns/%.o: $(SRC_DIR)/%.cpp

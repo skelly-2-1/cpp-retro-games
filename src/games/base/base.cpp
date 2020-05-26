@@ -11,6 +11,7 @@
 #include "base.h"
 #include "imgui/imgui_user.h"
 #include "imgui/imgui_internal.h"
+#include "snd/snd.h"
 
 /*
 @brief
@@ -253,4 +254,19 @@ bool retrogames::game_base_t::base_draw(bool render)
     }
 
     return ret;
+}
+
+/*
+@brief
+
+    Pauses the game
+*/
+void retrogames::game_base_t::pause(void)
+{
+    if (paused) return;
+
+    paused = true;
+
+    // play the pause sound
+    snd->play_sound(snd_t::sounds_e::SOUND_PAUSE);
 }
