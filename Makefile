@@ -73,75 +73,75 @@ ifneq "$(findstring ns, $(MAKECMDGOALS))" ""
 
 	# change platform name (we don't want to compile for Windows or Linux anymore)
 	# since we ran 'make ns'
-	PLATFORM_NAME := ns
+    PLATFORM_NAME := ns
 
 	# tell the compiler which platform we're on
     CXXFLAGS += -DPLATFORM_NS
 
 	# using other compiler for NS
-	CXX := aarch64-none-elf-$(CXX)
+    CXX := aarch64-none-elf-$(CXX)
 
 	# this too
-	NM := aarch64-none-elf-$(NM)
+    NM := aarch64-none-elf-$(NM)
 
 	# flags we need for the compilation
-	ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
-	CXXFLAGS += $(ARCH) -ffunction-sections -D__SWITCH__ -fno-rtti -fno-exceptions
-	LDFLAGS += -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(OBJ_DIR)/$(PLATFORM_NAME)/$(OUTPUT_NAME).map
+    ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
+    CXXFLAGS += $(ARCH) -ffunction-sections -D__SWITCH__ -fno-rtti -fno-exceptions
+    LDFLAGS += -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(OBJ_DIR)/$(PLATFORM_NAME)/$(OUTPUT_NAME).map
 
 	# add the library directories of libnx
-	LDPATHS += -L"$(DEVKITPRO)/portlibs/switch/lib" -L"$(DEVKITPRO)/libnx/lib"
+    LDPATHS += -L"$(DEVKITPRO)/portlibs/switch/lib" -L"$(DEVKITPRO)/libnx/lib"
 
 	# add devkitpro include directories
-	INCLUDES += -I"$(DEVKITPRO)/libnx/include" -I"$(DEVKITPRO)/portlibs/switch/include"
+    INCLUDES += -I"$(DEVKITPRO)/libnx/include" -I"$(DEVKITPRO)/portlibs/switch/include"
 
 	# libraries needed for the Nintendo Switch
-	LDLIBS += -lglad -lEGL -lglapi -ldrm_nouveau -lnx
+    LDLIBS += -lglad -lEGL -lglapi -ldrm_nouveau -lnx
 
 	# taken from devkitpro
-	ERROR_FILTER := 2>&1 | sed -e 's/\(.[a-zA-Z]\+\):\([0-9]\+\):/\1(\2):/g'
+    ERROR_FILTER := 2>&1 | sed -e 's/\(.[a-zA-Z]\+\):\([0-9]\+\):/\1(\2):/g'
 
-	CXXFLAGS += -MMD -MP
+    CXXFLAGS += -MMD -MP
 
 	# add the devkitpro tools directory to PATH to be able to use the programs it contains
-	DEVKITPATH = $(shell echo "$(DEVKITPRO)" | sed -e 's/^\([a-zA-Z]\):/\/\1/')
+    DEVKITPATH = $(shell echo "$(DEVKITPRO)" | sed -e 's/^\([a-zA-Z]\):/\/\1/')
 
-	export PATH	:= $(DEVKITPATH)/tools/bin:$(DEVKITPATH)/devkitA64/bin:$(PATH)
+    export PATH	:= $(DEVKITPATH)/tools/bin:$(DEVKITPATH)/devkitA64/bin:$(PATH)
 else
     ifeq ($(detected_OS),Windows)
 		# Windows, tell the compiler which platform we're on
         CXXFLAGS += -DPLATFORM_WINDOWS
 
 		# check if the DirectX SDK is installed
-		ifeq ($(strip $(DXSDK_DIR)),)
-			$(error "Failed to find a valid DirectX SDK installation. Please set DXSDK_DIR in PATH")
+        ifeq ($(strip $(DXSDK_DIR)),)
+            $(error "Failed to find a valid DirectX SDK installation. Please set DXSDK_DIR in PATH")
 		endif
 
 		# include the DirectX SDK
-		INCLUDES += -I"$(DXSDK_DIR)Include"
+        INCLUDES += -I"$(DXSDK_DIR)Include"
 
 		# tell the compiler where to include libraries for DirectX
-		LDPATHS += -L"$(DXSDK_DIR)Lib\x64"
+        LDPATHS += -L"$(DXSDK_DIR)Lib\x64"
 
 		# include directx, gdi32 and xinput (xinput is optional: see note 2 at the top of this file)
-		LDLIBS += -ld3d9 -ld3dx9 -lxinput -lgdi32
+        LDLIBS += -ld3d9 -ld3dx9 -lxinput -lgdi32
 
 		# add .exe to the output name
-		OUTPUT_NAME := $(OUTPUT_NAME).exe
+        OUTPUT_NAME := $(OUTPUT_NAME).exe
 
 		# stop the console from coming up in windows
-		LDFLAGS += -mwindows
+        LDFLAGS += -mwindows
 	endif
 
     ifeq ($(detected_OS),Linux)
         CXXFLAGS += -DPLATFORM_LINUX
 
 		# include necessary libraries (opengl, glfw, etc.)
-		LDLIBS += -lGL -lGLEW -lglfw3 -ldl -lX11 -lpthread
+        LDLIBS += -lGL -lGLEW -lglfw3 -ldl -lX11 -lpthread
 	endif
 
 	# include SFML audio library
-	LDLIBS += -lsfml-audio
+    LDLIBS += -lsfml-audio
 endif
 
 # set our target
