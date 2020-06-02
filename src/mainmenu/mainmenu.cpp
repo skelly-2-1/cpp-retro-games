@@ -1193,13 +1193,18 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             {
                 ImGui::TextWrapped("Every external influence to this project is listed here. I'm sorry if I forgot anyone or anything, feel free to remind me though.");
                 ImGui::Separator();
-                ImGui::BulletText("ocornut - Dear ImGui");
-                ImGui::BulletText("devkitpro/libnx - compiler toolchain/SDK for the Switch");
-                ImGui::BulletText("RetroArch - Design inspiration");
-                ImGui::BulletText("nlohmann - JSON library");
-                ImGui::BulletText("Microsoft - DirectX SDK (Windows backend) + Win32API");
-                ImGui::BulletText("GLFW - Linux backend");
-                ImGui::BulletText("Probably various other things I forgot");
+                ImGui::TextWrapped("ocornut - Dear ImGui");
+                ImGui::TextWrapped("devkitpro/libnx - compiler toolchain/SDK for the Switch");
+                ImGui::TextWrapped("RetroArch - Design inspiration");
+                ImGui::TextWrapped("nlohmann - JSON library");
+                ImGui::TextWrapped("Microsoft - DirectX SDK (Windows backend) + Win32API");
+                ImGui::TextWrapped("chelle19 - Ding sound (freesound.org)");
+                ImGui::TextWrapped("crisstanza - Pause sound (freesound.org)");
+                ImGui::TextWrapped("InspectorJ - Chewing, Breadstick, Single, E.wav (freesound.org)");
+                ImGui::TextWrapped("GLFW - Linux backend");
+                ImGui::TextWrapped("SFML - Sound library for Windows and Linux");
+                ImGui::TextWrapped("SDL2 - Sound library for the Switch");
+                ImGui::TextWrapped("Probably various other things I forgot");
             }
 
             if (draw_bottom_button)

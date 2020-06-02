@@ -27,8 +27,13 @@ Retro games made by Steven Kelly in C++. Supports Windows, Linux and the Nintend
 * devkitpro/libnx - [compiler toolchain/SDK for the Switch](https://devkitpro.org/wiki/Getting_Started "Link to website")
 * [RetroArch](https://www.retroarch.com/ "Link to website") - Design inspiration
 * nlohmann - [JSON library](https://github.com/nlohmann/json "Link to library")
+* chelle19 - [Ding sound (freesound.org)](https://freesound.org/people/chelle19/sounds/320201/ "Link to sound")
+* crisstanza - [Pause sound (freesound.org)](https://freesound.org/people/crisstanza/sounds/167127/ "Link to sound")
+* InspectorJ - [Chewing, Breadstick, Single, E.wav (freesound.org)](https://freesound.org/people/InspectorJ/sounds/429598/ "Link to sound")
 * Microsoft - DirectX SDK (Windows backend) + Win32API
 * GLFW - Linux backend
+* SFML - Sound library for Windows and Linux
+* SDL2 - Sound library for the Switch
 * Probably various other things I forgot - feel free to contact me though
 
 # Images
