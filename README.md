@@ -8,14 +8,14 @@ Retro games made by Steven Kelly in C++. Supports Windows, Linux and the Nintend
 
 # Compiling
 ## Windows
-* MinGW and DirectX SDK required
+* MinGW, DirectX SDK and SFML required
 
 ## Linux
-* GLFW and an OpenGL Loader required
+* GLFW, SFML and an OpenGL Loader required
 
 ## Nintendo Switch
 * ONLY works on Switches with custom firmware installed
-* devkitpro is required with installed Switch support. Also needs EGL, glad and gladpi libraries installed
+* devkitpro is required with installed Switch support. Also needs SDL2, EGL, glad and gladpi libraries installed
 
 # Notes
 * This is developed in Visual Studio Code. I've included my own .vscode directory, which may not work for you
