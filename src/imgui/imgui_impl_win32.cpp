@@ -147,25 +147,31 @@ static bool ImGui_ImplWin32_UpdateMouseCursor()
     return true;
 }
 
-static void ImGui_ImplWin32_UpdateMousePos()
+static void ImGui_ImplWin32_UpdateMousePos(bool update = false, float x = -FLT_MAX, float y = -FLT_MAX)
 {
     ImGuiIO& io = ImGui::GetIO();
 
     // Set OS mouse position if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
-    if (io.WantSetMousePos)
+    if (!update && io.WantSetMousePos)
     {
         POINT pos = { (int)io.MousePos.x, (int)io.MousePos.y };
         ::ClientToScreen(g_hWnd, &pos);
         ::SetCursorPos(pos.x, pos.y);
     }
 
-    // Set mouse position
-    io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
-    POINT pos;
-    if (HWND active_window = ::GetForegroundWindow())
-        if (active_window == g_hWnd || ::IsChild(active_window, g_hWnd))
-            if (::GetCursorPos(&pos) && ::ScreenToClient(g_hWnd, &pos))
-                io.MousePos = ImVec2((float)pos.x, (float)pos.y);
+    // Update mouse position
+    if (!update) return;
+
+    io.MousePos = ImVec2(x, y);
+
+    if (io.MousePos.x == -FLT_MAX && io.MousePos.y == -FLT_MAX)
+    {
+        POINT pos;
+        if (HWND active_window = ::GetForegroundWindow())
+            if (active_window == g_hWnd || ::IsChild(active_window, g_hWnd))
+                if (::GetCursorPos(&pos) && ::ScreenToClient(g_hWnd, &pos))
+                    io.MousePos = ImVec2((float)pos.x, (float)pos.y);
+    }
 }
 
 // Gamepad navigation mapping
@@ -217,7 +223,7 @@ static void ImGui_ImplWin32_UpdateGamepads()
 #endif // #ifndef IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
 }
 
-void    ImGui_ImplWin32_NewFrame()
+void ImGui_ImplWin32_NewFrame()
 {
     ImGuiIO& io = ImGui::GetIO();
     IM_ASSERT(io.Fonts->IsBuilt() && "Font atlas not built! It is generally built by the renderer back-end. Missing call to renderer _NewFrame() function? e.g. ImGui_ImplOpenGL3_NewFrame().");
@@ -342,6 +348,14 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
         if ((UINT)wParam == DBT_DEVNODES_CHANGED)
             g_WantUpdateHasGamepad = true;
         return 0;
+    case WM_KILLFOCUS:
+        io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
+    case WM_ACTIVATE:
+        if (LOWORD(wParam) != WA_INACTIVE) ImGui_ImplWin32_UpdateMousePos(true);
+    case WM_MOUSEMOVE:
+        ImGui_ImplWin32_UpdateMousePos(true, static_cast<float>(LOWORD(lParam)), static_cast<float>(HIWORD(lParam)));
+    default:
+        break;
     }
     return 0;
 }

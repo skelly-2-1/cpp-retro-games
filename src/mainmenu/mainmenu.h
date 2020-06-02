@@ -45,6 +45,13 @@ namespace retrogames
 
         float global_scaling;
 
+        /*
+        @brief
+
+            Sets up the ImGui style
+        */
+        void setup_style(void);
+
     public:
 
         /*

@@ -11,7 +11,6 @@
 #include "base.h"
 #include "imgui/imgui_user.h"
 #include "imgui/imgui_internal.h"
-#include "snd/snd.h"
 
 /*
 @brief
@@ -268,5 +267,5 @@ void retrogames::game_base_t::pause(void)
     paused = true;
 
     // play the pause sound
-    snd->play_sound(snd_t::sounds_e::SOUND_PAUSE);
+    play_sound_effect(snd_t::sounds_e::SOUND_PAUSE);
 }

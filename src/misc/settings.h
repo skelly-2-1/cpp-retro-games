@@ -68,7 +68,9 @@ namespace retrogames
 
 		area_size_t resolution_area;
 
-		cfgvalue_t* draw_fps, *draw_frametime, *draw_playtime, *draw_position, *timeout_time;
+		cfgvalue_t* draw_fps, *draw_frametime, *draw_playtime, *draw_position;
+		cfgvalue_t* timeout_time;
+		cfgvalue_t* sound_effect_volume;
 
 		main_settings_t()
 		{
@@ -78,7 +80,9 @@ namespace retrogames
 
 			resolution_area = area_size_t(1280, 720);
 
-			draw_fps = draw_frametime = draw_playtime = draw_position = timeout_time = nullptr;
+			draw_fps = draw_frametime = draw_playtime = draw_position = nullptr;
+			timeout_time = nullptr;
+			sound_effect_volume = nullptr;
 		}
 
 	};
@@ -169,6 +173,7 @@ namespace retrogames
 			main_settings.draw_playtime = &create("main_draw_playtime", true);
 			main_settings.draw_position = &create("main_draw_position_alignment", "topright");
 			main_settings.timeout_time = &create("main_lostfocus_timeout_time", 3u);
+			main_settings.sound_effect_volume = &create("main_sound_effect_volume", 50.f);
 		}
 
 		/*

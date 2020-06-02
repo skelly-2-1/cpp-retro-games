@@ -48,6 +48,9 @@ void retrogames::mainmenu_t::initialize(settings_t* settings)
     // Create the games manager
     games_manager = std::make_unique<games_manager_t>(settings, &default_font_small, &default_font_mid, &default_font_big);
 
+    // Setup the ImGui style
+    setup_style();
+
     // Here we add our games. Each game can have a pointer to it's icon,
     // version numbering, and name.
     games_manager->add_game<games::snake_t>("snake");
@@ -96,6 +99,8 @@ void retrogames::mainmenu_t::create_fonts(void)
 */
 void retrogames::mainmenu_t::reset(void)
 {
+    setup_style();
+
     create_fonts();
 
     if (reset_game)
@@ -104,6 +109,16 @@ void retrogames::mainmenu_t::reset(void)
 
         reset_game = false;
     }
+}
+
+/*
+@brief
+
+    Sets up the ImGui style
+*/
+void retrogames::mainmenu_t::setup_style(void)
+{
+    ImGui::GetStyle().ScrollbarSize *= 2.f;
 }
 
 /*
@@ -145,8 +160,11 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
         uint32_t timeout_time;
 
+        float sound_effect_volume;
+
         cfgvalue_t* cfgvalue_fps, *cfgvalue_vsync, *cfgvalue_fullscreen, *cfgvalue_resolution;
         cfgvalue_t* cfgvalue_draw_fps, *cfgvalue_draw_frametime, *cfgvalue_draw_playtime, *cfgvalue_draw_position, *cfgvalue_timeout_time;
+        cfgvalue_t* cfgvalue_sound_effect_volume;
 
         void load_from_cfgvalues(void)
         {
@@ -159,6 +177,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             draw_playtime = cfgvalue_draw_playtime->get<bool>();
             draw_position = cfgvalue_draw_position->get<std::string>();
             timeout_time = cfgvalue_timeout_time->get<uint32_t>();
+            sound_effect_volume = cfgvalue_sound_effect_volume->get<float>();
         }
 
         video_settings_t(settings_t* settings) :
@@ -170,7 +189,8 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             cfgvalue_draw_frametime(nullptr),
             cfgvalue_draw_playtime(nullptr),
             cfgvalue_draw_position(nullptr),
-            cfgvalue_timeout_time(nullptr)
+            cfgvalue_timeout_time(nullptr),
+            cfgvalue_sound_effect_volume(nullptr)
         {
             fps = settings->get_main_settings().fps->get<uint32_t>();
             vsync = settings->get_main_settings().vsync->get<bool>();
@@ -181,9 +201,10 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             draw_playtime = settings->get_main_settings().draw_playtime->get<bool>();
             draw_position = settings->get_main_settings().draw_position->get<std::string>();
             timeout_time = settings->get_main_settings().timeout_time->get<uint32_t>();
+            sound_effect_volume = settings->get_main_settings().sound_effect_volume->get<float>();
         }
 
-        video_settings_t(uint32_t fps, bool vsync, bool fullscreen, std::string resolution, bool draw_fps, bool draw_frametime, bool draw_playtime, std::string draw_position, uint32_t timeout_time) :
+        video_settings_t(uint32_t fps, bool vsync, bool fullscreen, std::string resolution, bool draw_fps, bool draw_frametime, bool draw_playtime, std::string draw_position, uint32_t timeout_time, float sound_effect_volume) :
             cfgvalue_fps(nullptr),
             cfgvalue_vsync(nullptr),
             cfgvalue_fullscreen(nullptr),
@@ -196,9 +217,10 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             draw_frametime(draw_frametime),
             draw_playtime(draw_playtime),
             draw_position(draw_position),
-            timeout_time(timeout_time) {}
+            timeout_time(timeout_time),
+            sound_effect_volume(sound_effect_volume) {}
 
-        video_settings_t(cfgvalue_t* fps, cfgvalue_t* vsync, cfgvalue_t* fullscreen, cfgvalue_t* resolution, cfgvalue_t* cfgvalue_draw_fps, cfgvalue_t* cfgvalue_draw_frametime, cfgvalue_t* cfgvalue_draw_playtime, cfgvalue_t* cfgvalue_draw_position, cfgvalue_t* cfgvalue_timeout_time) :
+        video_settings_t(cfgvalue_t* fps, cfgvalue_t* vsync, cfgvalue_t* fullscreen, cfgvalue_t* resolution, cfgvalue_t* cfgvalue_draw_fps, cfgvalue_t* cfgvalue_draw_frametime, cfgvalue_t* cfgvalue_draw_playtime, cfgvalue_t* cfgvalue_draw_position, cfgvalue_t* cfgvalue_timeout_time, cfgvalue_t* cfgvalue_sound_effect_volume) :
             cfgvalue_fps(fps),
             cfgvalue_vsync(vsync),
             cfgvalue_fullscreen(fullscreen),
@@ -207,11 +229,13 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             cfgvalue_draw_frametime(cfgvalue_draw_frametime),
             cfgvalue_draw_playtime(cfgvalue_draw_playtime),
             cfgvalue_draw_position(cfgvalue_draw_position),
-            cfgvalue_timeout_time(cfgvalue_timeout_time)
+            cfgvalue_timeout_time(cfgvalue_timeout_time),
+            cfgvalue_sound_effect_volume(cfgvalue_sound_effect_volume)
         {
             load_from_cfgvalues();
         }
 
+        // outputs true if the video mode needs to be reset when we start the game
         bool differs(const video_settings_t& other)
         {
             return fps != other.fps || vsync != other.vsync || fullscreen != other.fullscreen || resolution.compare(other.resolution) != 0;
@@ -591,7 +615,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             ImGui::SetNextWindowPos({main_window_pos.x+ImGui::GetStyle().WindowPadding.x,main_window_pos.y+ImGui::GetStyle().WindowPadding.y}, ImGuiCond_Always);
         }
 
-        if (!draw_bottom_button || ImGui::BeginChild("Main child window #1", ImVec2(main_window_size.x-ImGui::GetStyle().WindowPadding.x*2.f, (main_window_size.y-((ImGui::GetFrameHeightWithSpacing() + window_y_offset) + ImGui::GetStyle().WindowPadding.y))-ImGui::GetStyle().WindowPadding.y*2.f), false, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove/* | ImGuiWindowFlags_NoNav*/))
+        if (!draw_bottom_button || ImGui::BeginChild("Main child window #1", ImVec2(main_window_size.x-ImGui::GetStyle().WindowPadding.x*2.f, (main_window_size.y-((ImGui::GetFrameHeightWithSpacing() + window_y_offset) + ImGui::GetStyle().WindowPadding.y))-ImGui::GetStyle().WindowPadding.y*2.f), false, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize/* | ImGuiWindowFlags_NoScrollbar*/ | ImGuiWindowFlags_NoMove/* | ImGuiWindowFlags_NoNav*/))
         {
             if (selected_item == selection_e::selection_start)
             {
@@ -631,7 +655,8 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                                 &settings->get(gamename + "_draw_frametime"),
                                 &settings->get(gamename + "_draw_playtime"),
                                 &settings->get(gamename + "_draw_position_alignment"),
-                                &settings->get(gamename + "_lostfocus_timeout_time")
+                                &settings->get(gamename + "_lostfocus_timeout_time"),
+                                &settings->get(gamename + "_sound_effect_volume")
                             );
 
                             // Grab the wanted resolution from our settings
@@ -711,11 +736,13 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                             &settings->get(gamename + "_draw_frametime"),
                             &settings->get(gamename + "_draw_playtime"),
                             &settings->get(gamename + "_draw_position_alignment"),
-                            &settings->get(gamename + "_lostfocus_timeout_time")
+                            &settings->get(gamename + "_lostfocus_timeout_time"),
+                            &settings->get(gamename + "_sound_effect_volume")
                         );
 
                         ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
-                        ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!");
+                        ImGuiUser::inputslider_uint32_t(game_video_settings.cfgvalue_timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!", global_scaling);
+                        ImGuiUser::inputslider_float(game_video_settings.cfgvalue_sound_effect_volume, "Sound effect volume", 100.f, 0.f, "The volume of sound effects.", global_scaling, .1f, 1.f, 1.f, "%.1f%%");
 
                         ImGui::PopStyleColor(6);
 
@@ -877,6 +904,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                             game_video_settings.cfgvalue_fullscreen->set(settings->get_main_settings().fullscreen->get<bool>());
                             game_video_settings.cfgvalue_resolution->set(settings->get_main_settings().resolution->get<std::string>());
                             game_video_settings.cfgvalue_vsync->set(settings->get_main_settings().vsync->get<bool>());
+                            game_video_settings.cfgvalue_sound_effect_volume->set(settings->get_main_settings().sound_effect_volume->get<float>());
                             game_video_settings.load_from_cfgvalues();
 #else
                             const auto& gamename = selected_game->get_information().name;
@@ -886,6 +914,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                             settings->get(gamename + "_draw_playtime").set(settings->get_main_settings().draw_playtime->get<bool>());
                             settings->get(gamename + "_draw_position_alignment").set(settings->get_main_settings().draw_position->get<std::string>());
                             settings->get(gamename + "_lostfocus_timeout_time").set(settings->get_main_settings().timeout_time->get<uint32_t>());
+                            settings->get(gamename + "_sound_effect_volume").set(settings->get_main_settings().sound_effect_volume->get<float>());
 #endif
 
                             load_align_combo = load_resolution = true;
@@ -911,7 +940,6 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             {
                 ImGui::Text("Available games:");
                 ImGui::Separator();
-                //ImGui::Columns(4, nullptr, false);
 
                 auto border_size = 1.f;
                 auto button_size_box = std::ceil(((static_cast<float>(resolution_area.width) - indent_width * 2.f) - selection_size.x) / 4.f) - (ImGui::GetStyle().ItemSpacing.x/* + border_size * 2.f*/);
@@ -933,15 +961,12 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
                         selected_game = games_manager->select_game(game_name);
                         selected_game_name->set(game_name);
-
-                        //ImGui::NextColumn();
                     }
 
                     count++;
                 }
 
                 ImGui::PopStyleVar();
-                //ImGui::Columns(1);
             }
             else if (selected_item == selection_e::selection_options)
             {
@@ -963,7 +988,8 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
                 ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
 
-                ImGuiUser::inputslider_uint32_t(settings->get_main_settings().timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!");
+                ImGuiUser::inputslider_uint32_t(settings->get_main_settings().timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!", global_scaling);
+                ImGuiUser::inputslider_float(settings->get_main_settings().sound_effect_volume, "Sound effect volume", 100.f, 0.f, "The volume of sound effects.", global_scaling, .1f, 1.f, 1.f, "%.1f%%");
 
                 ImGui::PopStyleColor(6);
 
@@ -1035,6 +1061,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
                 ImGuiUser::inputslider_uint32_t(settings->get_main_settings().fps, "FPS", 1000u, 0u, "Sets the framerate limit. This setting will be ignored if vertical sync is enabled.", global_scaling);
                 ImGuiUser::inputslider_uint32_t(settings->get_main_settings().timeout_time, "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!");
+                ImGuiUser::inputslider_float(settings->get_main_settings().sound_effect_volume, "Sound effect volume", 100.f, 0.f, "The volume of sound effects.", global_scaling, .1f, 1.f, 1.f, "%.1f%%");
 
                 ImGui::PopStyleColor(6);
 

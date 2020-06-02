@@ -8,6 +8,8 @@
     Load/manage and play music/.wav files from memory
 */
 
+#pragma once
+
 #include <array>
 #include <stdint.h>
 

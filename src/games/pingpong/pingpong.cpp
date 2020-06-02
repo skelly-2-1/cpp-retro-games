@@ -11,7 +11,6 @@
 #include "pingpong.h"
 #include "imgui/imgui_user.h"
 #include "misc/macros.h"
-#include "snd/snd.h"
 
 namespace retrogames
 {
@@ -426,7 +425,7 @@ bool retrogames::games::pingpong_t::draw(bool render)
             }
 
             // play ding sound
-            snd->play_sound(snd_t::sounds_e::SOUND_DING);
+            play_sound_effect(snd_t::sounds_e::SOUND_DING);
         }
         else
         {

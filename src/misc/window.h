@@ -81,21 +81,22 @@ namespace retrogames
             if (hwnd != NULL) return true;
 
             // Calculate the client size
-            RECT rect;
+            RECT rect{};
+
+            // The window style we want to use
+            DWORD window_style = (WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME) ^ WS_MAXIMIZEBOX;
 
             if (!fullscreen)
             {
-                rect.left = rect.top = 0;
                 rect.bottom = size.height;
                 rect.right = size.width;
 
-                if (!AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE)) return false;
+                if (!AdjustWindowRect(&rect, window_style, FALSE)) return false;
             }
             else
             {
                 rect.right = size.width;
                 rect.bottom = size.height;
-                rect.left = rect.top = 0;
             }
 
             // If not, create it!
@@ -103,7 +104,7 @@ namespace retrogames
                 0,                                                          // Optional window styles.
                 class_name.c_str(),                                         // Window class
                 title.c_str(),                                              // Window text
-                (WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME) ^ WS_MAXIMIZEBOX,     // Window style
+                window_style,                                               // Window style
 
                 // Position
                 CW_USEDEFAULT, CW_USEDEFAULT,

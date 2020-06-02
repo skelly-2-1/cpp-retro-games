@@ -74,6 +74,7 @@ namespace retrogames
             settings->create(name + "_draw_playtime", main_settings.draw_playtime->get<bool>());
             settings->create(name + "_draw_position_alignment", main_settings.draw_position->get<std::string>());
             settings->create(name + "_lostfocus_timeout_time", main_settings.timeout_time->get<uint32_t>());
+            settings->create(name + "_sound_effect_volume", main_settings.sound_effect_volume->get<float>());
 
             games[name] = new T(settings, name, default_font_small, default_font_mid, default_font_big, version, icon);
         }

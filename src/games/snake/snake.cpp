@@ -16,7 +16,6 @@
 #include "misc/area_size.h"
 #include "misc/macros.h"
 #include "imgui/imgui_user.h"
-#include "snd/snd.h"
 #include "util/util.h"
 
 /*
@@ -666,7 +665,7 @@ retrogames::games::snake_t::~snake_t()
 void retrogames::games::snake_t::eat(void)
 {
     // play the eat sound
-    snd->play_sound(snd_t::sounds_e::SOUND_EAT);
+    play_sound_effect(snd_t::sounds_e::SOUND_EAT);
 
     // we just ate (@move() will make use of this)
     eaten = true;

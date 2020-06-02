@@ -17,6 +17,7 @@
 #include "misc/settings.h"
 #include "misc/timer.h"
 #include "imgui/imgui.h"
+#include "snd/snd.h"
 
 namespace retrogames
 {
@@ -142,6 +143,29 @@ namespace retrogames
         area_size_t base_resolution_area;
 
     public:
+
+        /*
+        @brief
+
+            Plays a sound effect with the games' specified volume (unless override is used)
+        */
+        void play_sound_effect(snd_t::sounds_e sound, float volume_override = -1.f)
+        {
+            float volume = 100.f;
+
+            if (volume_override >= 0.f && volume_override <= 100.f)
+            {
+                volume = volume_override;
+            }
+            else
+            {
+                volume = settings->get(get_information().name + "_sound_effect_volume").get<float>();
+            }
+
+            if (volume == 0) return;
+
+            snd->play_sound(sound, volume);
+        }
 
         /*
         @brief
