@@ -21,13 +21,19 @@
 #include "misc/settings.h"
 #include "imgui/imgui.h"
 
+// so we don't have to include imgui/directx headers here
+class IDirect3DDevice9;
+
 namespace retrogames
 {
 
-	// So we don't have to include the headers here
+	// in case we need to access the d3d9device from somewhere globally
+	extern IDirect3DDevice9* global_d3d9device;
+
+	// so we don't have to include the headers here
 	class window_t;
 
-	// So we don't have to include imgui/directx headers here
+	// so we don't have to include imgui/directx headers here
 	namespace internal
 	{
 
