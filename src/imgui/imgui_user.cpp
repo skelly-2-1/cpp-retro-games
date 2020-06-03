@@ -252,7 +252,7 @@ void ImGuiUser::draw_info(const ImVec2& pos, std::string info)
     pos_.y -= size.y * .5f;
 
     ImGui::GetForegroundDrawList()->AddRectFilled(pos_, ImVec2{pos_.x+size.x,pos_.y+size.y}, ImGui::GetColorU32(background_color));
-    ImGui::GetForegroundDrawList()->AddRect(pos_, ImVec2{pos_.x+size.x,pos_.y+size.y}, ImGui::GetColorU32(border_color));
+    ImGui::GetForegroundDrawList()->AddRect(pos_, ImVec2{pos_.x+size.x,pos_.y+size.y}, ImGui::GetColorU32(border_color), 0.f, 0, 2.f);
     ImGui::GetForegroundDrawList()->AddText(ImVec2{pos_.x+ImGui::GetStyle().ItemSpacing.x+ImGui::GetStyle().FramePadding.x,pos_.y+ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().FramePadding.y}, ImGui::GetColorU32(text_color), info.c_str());
 
     /*ImGui::SetNextWindowPos(ImVec2{pos.x - size.x * .5f, pos.y - size.y * .5f}, ImGuiCond_Always);
