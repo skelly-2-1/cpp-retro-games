@@ -98,6 +98,9 @@ ifneq "$(findstring ns, $(MAKECMDGOALS))" ""
 	# libraries needed for the Nintendo Switch
     LDLIBS += -lglad -lEGL -lglapi -ldrm_nouveau -lnx
 
+	# also include the SDL2 library
+    LDLIBS += `$(DEVKITPRO)/portlibs/switch/bin/aarch64-none-elf-pkg-config --libs SDL2_mixer`
+
 	# taken from devkitpro
     ERROR_FILTER := 2>&1 | sed -e 's/\(.[a-zA-Z]\+\):\([0-9]\+\):/\1(\2):/g'
 

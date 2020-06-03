@@ -27,16 +27,16 @@ namespace retrogames
 
     private:
 
-        // Our list of games (name, pointer)
+        // our list of games (name, pointer)
         std::unordered_map<std::string, game_base_t*> games;
 
-        // Pointer to our settings
+        // pointer to our settings
         settings_t* settings;
 
-        // Pointer to the current game
+        // pointer to the current game
         game_base_t* current_game;
 
-        // Pointer to pointers to default fonts
+        // pointers to pointers to default fonts
         ImFont** default_font_small, **default_font_big, **default_font_mid;
 
     public:
@@ -63,7 +63,7 @@ namespace retrogames
             auto& main_settings = settings->get_main_settings();
 
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)   
-            // Create game-specific video settings
+            // create game-specific video settings
             settings->create(name + "_video_fps", main_settings.fps->get<uint32_t>());
             settings->create(name + "_video_fullscreen", main_settings.fullscreen->get<bool>());
             settings->create(name + "_video_vsync", main_settings.vsync->get<bool>());

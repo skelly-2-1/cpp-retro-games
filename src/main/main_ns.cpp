@@ -224,10 +224,16 @@ void retrogames::main(void)
             };
 
             // Arrow keys
-            handle_key(KEY_DOWN, ImGuiKey_DownArrow);
-            handle_key(KEY_UP, ImGuiKey_UpArrow);
-            handle_key(KEY_LEFT, ImGuiKey_LeftArrow);
-            handle_key(KEY_RIGHT, ImGuiKey_RightArrow);
+            handle_key(KEY_DOWN, ImGuiKey_S);
+            handle_key(KEY_UP, ImGuiKey_W);
+            handle_key(KEY_LEFT, ImGuiKey_A);
+            handle_key(KEY_RIGHT, ImGuiKey_D);
+
+            // B/A/X/Y keys
+            handle_key(KEY_B, ImGuiKey_DownArrow);
+            handle_key(KEY_X, ImGuiKey_UpArrow);
+            handle_key(KEY_Y, ImGuiKey_LeftArrow);
+            handle_key(KEY_A, ImGuiKey_RightArrow);
 
             // Plus mapped to Escape (pause)
             handle_key(KEY_PLUS, ImGuiKey_Escape);
