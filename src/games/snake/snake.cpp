@@ -890,7 +890,7 @@ void retrogames::games::snake_t::draw_death_menu(void)
     {
         if (death_state == DEATH_STATE::DEATH_STATE_MAIN)
         {
-            static auto button_size = ImVec2(100.f * 3.f, 0.f);
+            auto button_size = ImVec2{ImGui::CalcTextSize("Back to main menu").x+ImGui::GetStyle().FramePadding.x*2.f,0.f};
 
             ImGui::Text("You died.");
             ImGui::Text("Time alive:");
@@ -921,7 +921,9 @@ void retrogames::games::snake_t::draw_death_menu(void)
         {
             ImGui::Text("Are you sure?");
 
-            if (ImGui::Button("Yes", ImVec2(65.f, 0.)))
+            auto button_size = ImVec2{((ImGui::CalcTextSize("Are you sure?").x+ImGui::GetStyle().FramePadding.x*2.f)*.5f)-ImGui::GetStyle().ItemInnerSpacing.x*2.f,0.f};
+
+            if (ImGui::Button("Yes", button_size))
             {
                 // close the game
                 should_exit = true;
@@ -929,7 +931,7 @@ void retrogames::games::snake_t::draw_death_menu(void)
 
             ImGui::SameLine();
 
-            if (ImGui::Button("No", ImVec2(65.f, 0.))) death_state = DEATH_STATE::DEATH_STATE_MAIN;
+            if (ImGui::Button("No", button_size)) death_state = DEATH_STATE::DEATH_STATE_MAIN;
         }
     }
 }
