@@ -12,7 +12,7 @@
 #pragma once
 
 // Version of this program
-#define CPP_RETRO_GAMES_VERSION "0.1"
+#define CPP_RETRO_GAMES_VERSION "0.11"
 
 // If defined and the settings system encounters an error, an error
 // will be spewed instead of just exiting
