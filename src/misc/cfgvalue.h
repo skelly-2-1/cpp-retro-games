@@ -28,9 +28,14 @@
 #define CFGVALUE_STR(x) CFGVALUE_STRINGIZE(x)
 #define CFGVALUE_ABORT() { MessageBoxA(nullptr, (std::string("Config value manager encountered an error at line ") + CFGVALUE_STR(__LINE__) + " in file: " + CFGVALUE_STR(__FILE__)).c_str(), "error", MB_SETFOREGROUND | MB_ICONERROR); TerminateProcess(GetCurrentProcess(), 0); }
 #else
+#ifndef PLATFORM_EMSCRIPTEN
+#error no
 #define CFGVALUE_STRINGIZE(x) #x
 #define CFGVALUE_STR(x) CFGVALUE_STRINGIZE(x)
 #define CFGVALUE_ABORT() { fprintf(stderr, (std::string("Config value manager encountered an error at line ") + CFGVALUE_STR(__LINE__) + " in file: " + CFGVALUE_STR(__FILE__) + "\n").c_str()); std::abort(); }
+#else
+#define CFGVALUE_ABORT() std::abort()
+#endif
 #endif
 #else
 #define CFGVALUE_ABORT() std::abort()

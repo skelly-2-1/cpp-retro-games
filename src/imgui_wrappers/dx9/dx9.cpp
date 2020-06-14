@@ -198,7 +198,7 @@ public:
 
 			sprintf_s(fmt, "LPDIRECTD3DDEVICE9::Reset failed with error code: 0x%X", static_cast<DWORD>(hr));
 
-			MessageBoxA(NULL, fmt, "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
+			MessageBoxA(nullptr, fmt, "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
 
 			TerminateProcess(GetCurrentProcess(), EXIT_SUCCESS);
 		}

@@ -13,7 +13,9 @@
 #include "mainmenu.h"
 #include "imgui/imgui.h"
 #include "misc/macros.h"
+#include "misc/settings.h"
 #include "imgui/imgui_user.h"
+//#include "textures/textures.h"
 
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
 #include "util/util.h"
@@ -24,6 +26,18 @@
 #ifdef NS_ENABLE_NXLINK
 #include "misc/trace.h"
 #endif
+#endif
+
+#ifdef PLATFORM_EMSCRIPTEN
+namespace retrogames
+{
+
+	// see snd/snd.h
+	extern settings_t* global_settings;
+
+}
+
+#include <emscripten.h>
 #endif
 
 // games
@@ -119,6 +133,7 @@ void retrogames::mainmenu_t::reset(void)
 void retrogames::mainmenu_t::setup_style(void)
 {
     ImGui::GetStyle().ScrollbarSize *= 2.f;
+    ImGui::GetStyle().ScrollbarRounding = 0.f;
 }
 
 /*
@@ -275,6 +290,9 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
             settings->get_main_settings().fullscreen->set(original_video_settings.fullscreen);
             settings->get_main_settings().resolution->set(original_video_settings.resolution);
             settings->get_main_settings().vsync->set(original_video_settings.vsync);
+
+            // Reset the game at least if the video mode doesn't change
+            if (!main_reset_video_settings) selected_game->base_reset(settings, false);
         }
     }
 
@@ -290,7 +308,23 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         return false;
     }
 #else
-    if (game_running && selected_game != nullptr)
+    static bool last_game_running = false;
+    static bool main_reset_video_settings = false;
+
+    bool should_run_game = game_running && selected_game != nullptr;
+
+    if (last_game_running != should_run_game)
+    {
+        last_game_running = should_run_game;
+
+        if (should_run_game)
+        {
+            // Reset the game
+            if (!main_reset_video_settings) selected_game->base_reset(settings, false);
+        }
+    }
+
+    if (should_run_game)
     {
         ImGui::PushFont(default_font_big);
 
@@ -371,7 +405,11 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         selection_options,
 
         selection_credits,
+#ifndef PLATFORM_EMSCRIPTEN
         selection_exit,
+#else
+        selection_save,
+#endif
         selection_size
     };
 
@@ -392,7 +430,11 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
         "Select game",
         "Options",
         "Credits",
+#ifndef PLATFORM_EMSCRIPTEN
         "Exit"
+#else
+        "Save"
+#endif
 
     };
 
@@ -643,7 +685,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                         if (ImGui::Button("View options", button_size)) { start_state = start_game_e::START_GAME_STATE_OPTIONS; load_align_combo = load_resolution = true; }
                         if (ImGui::Button("Play", button_size))
                         {
-#ifndef PLATFORM_NS
+#if !defined(PLATFORM_NS) && !defined(PLATFORM_EMSCRIPTEN)
                             const auto& gamename = selected_game->get_information().name;
 
                             video_settings_t game_video_settings(
@@ -857,8 +899,6 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                         ImGuiUser::frame_height_spacing();
 #endif
 
-                        ImGui::TextWrapped("Game options");
-                        ImGui::Separator();
                         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
                         ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
                         ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
@@ -867,22 +907,88 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, slidergrab_color_active);
                         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, text_selected_bg);
 
-#ifdef PLATFORM_NS
+#if defined(PLATFORM_NS) || defined(PLATFORM_EMSCRIPTEN)
+                        ImGui::TextWrapped("Video/general game options");
+#else
+                        ImGui::TextWrapped("Game options");
+#endif
+                        ImGui::Separator();
+
+#if defined(PLATFORM_NS) || defined(PLATFORM_EMSCRIPTEN)
                         ImGui::PushStyleColor(ImGuiCol_Header, {1.f,1.f,1.f,0.f});
                         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, {(static_cast<float>(background_color.r()) / 255.f) * 1.5f, (static_cast<float>(background_color.g()) / 255.f) * 1.5f, (static_cast<float>(background_color.b()) / 255.f) * 1.5f, static_cast<float>(background_color.a()) / 255.f});
                         ImGui::PushStyleColor(ImGuiCol_HeaderActive, {(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f});
+
+                        const auto& gamename = selected_game->get_information().name;
+
+                        // sliders
+                        ImGuiUser::inputslider_uint32_t(&settings->get(gamename + "_lostfocus_timeout_time"), "Timeout (focus lost/start of game)", 10u, 0u, "The time in seconds the game will pause when starting the game or tabbing back into it. 0 means no timeout!", global_scaling);
+
+                        ImGui::Separator();
+
+                        // booleans
+                        ImGuiUser::toggle_button(&settings->get(gamename + "_draw_fps"), "Draw FPS", "If enabled, the FPS will be drawn in games using the specified alignment.");
+                        ImGuiUser::toggle_button(&settings->get(gamename + "_draw_frametime"), "Draw frametime", "If enabled, the frametime (in ms) will be drawn in games using the specified alignment.");
+                        ImGuiUser::toggle_button(&settings->get(gamename + "_draw_playtime"), "Draw playtime", "If enabled, the playtime (hh:mm:ss:ms) will be drawn in games using the specified alignment.");
+
+                        ImGui::Separator();
+
+                        // combos
+                        ImGui::TextUnformatted("Info alignment:");
+                        ImGui::SameLine();
+
+                        ImGuiUser::help_marker("FPS, frametime and playtime to be drawn via this alignment (if any of them are enabled).");
+
+                        static int32_t align_item = 0;
+
+                        if (load_align_combo)
+                        {
+                            load_align_combo = false;
+
+                            auto alignment = settings->get(gamename + "_draw_position_alignment").get<std::string>();
+
+                            std::transform(alignment.begin(), alignment.end(), alignment.begin(), ::tolower);
+
+                            if (alignment.length() >= 7)
+                            {
+                                if (alignment.compare("topright") == 0) align_item = 1;
+                                else if (alignment.compare("bottomleft") == 0) align_item = 2;
+                                else if (alignment.compare("bottomright") == 0) align_item = 3;
+                                else if (alignment.compare("topcenter") == 0) align_item = 4;
+                                else if (alignment.compare("bottomcenter") == 0) align_item = 5;
+                            }
+                        }
+
+                        ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth());
+
+                        static const char* alignment_items[] = { "Top left", "Top right", "Bottom left", "Bottom right", "Top center", "Bottom center" };
+
+                        if (ImGui::Combo("##ialign", &align_item, alignment_items, 6))
+                        {
+                            std::string new_alignment = alignment_items[align_item];
+
+                            new_alignment.erase(std::remove(new_alignment.begin(), new_alignment.end(), ' '), new_alignment.end());
+
+                            std::transform(new_alignment.begin(), new_alignment.end(), new_alignment.begin(), tolower);
+
+                            settings->get(gamename + "_draw_position_alignment").set(new_alignment);
+                        }
+
+                        ImGui::PopItemWidth();
+                        ImGuiUser::frame_height_spacing();
+                        ImGui::TextWrapped("Game options");
+                        ImGui::Separator();
 #endif
 
                         selected_game->draw_options(global_scaling);
 
-#ifndef PLATFORM_NS
+#if !defined(PLATFORM_NS) && !defined(PLATFORM_EMSCRIPTEN)
                         ImGui::PopStyleVar(2);
                         ImGui::PopStyleColor(12);
 #else
                         ImGui::PopStyleVar();
                         ImGui::PopStyleColor(9);
 #endif
-
 
                         if (subwindow_button_pressed)
                         {
@@ -893,7 +999,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                         }
                         else if (subwindow_button_pressed_2)
                         {
-#ifndef PLATFORM_NS
+#if !defined(PLATFORM_NS) && !defined(PLATFORM_EMSCRIPTEN)
                             // Apply defaults
                             game_video_settings.cfgvalue_draw_fps->set(settings->get_main_settings().draw_fps->get<bool>());
                             game_video_settings.cfgvalue_draw_frametime->set(settings->get_main_settings().draw_frametime->get<bool>());
@@ -979,7 +1085,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 static auto slidergrab_color = text_selected_bg;
                 static auto slidergrab_color_active = ImVec4{(static_cast<float>(background_color.r()) / 255.f) * 2.f, (static_cast<float>(background_color.g()) / 255.f) * 2.f, (static_cast<float>(background_color.b()) / 255.f) * 2.f, static_cast<float>(background_color.a()) / 255.f};
 
-#ifdef PLATFORM_NS
+#if defined(PLATFORM_NS) || defined(PLATFORM_EMSCRIPTEN)
                 // sliders
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, frame_bg_color);
                 ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_selected_bg);
@@ -1001,7 +1107,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 // Combos
                 ImGui::Separator();
 
-#ifndef PLATFORM_NS
+#if !defined(PLATFORM_NS) && !defined(PLATFORM_EMSCRIPTEN)
                 auto window_bg_color = main_window_bg_color;
 #endif
 
@@ -1176,6 +1282,7 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 }
 #endif
             }
+#ifndef PLATFORM_EMSCRIPTEN
             else if (selected_item == selection_e::selection_exit)
             {
                 ImGui::TextWrapped("Until next time, hope you enjoyed ;)");
@@ -1189,6 +1296,35 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
                 ImGui::PopStyleVar();
             }
+#else
+            else if (selected_item == selection_e::selection_save)
+            {
+                ImGui::TextWrapped("The emscripten (web) version of this has this as an added category - the settings can't be saved automatically. Hit this button to save them!");
+                ImGui::Separator();
+                
+                auto button_size = ImVec2{ImGui::GetContentRegionAvailWidth(),0.f};
+
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+
+                if (ImGui::Button("Save settings", button_size))
+                {
+                    global_settings->save();
+
+                    //persist Emscripten current data to Indexed Db
+                    EM_ASM(
+                        Module.syncdone = 0;
+                        FS.syncfs(false, function(err) {
+                            assert(!err);
+                            Module.syncdone = 1;
+                        });
+                    );
+
+                    set_notification("Settings saved!");
+                }
+
+                ImGui::PopStyleVar();
+            }
+#endif
             else if (selected_item == selection_e::selection_credits)
             {
                 ImGui::TextWrapped("Every external influence to this project is listed here. I'm sorry if I forgot anyone or anything, feel free to remind me though.");
@@ -1203,7 +1339,8 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
                 ImGui::TextWrapped("InspectorJ - Chewing, Breadstick, Single, E.wav (freesound.org)");
                 ImGui::TextWrapped("GLFW - Linux backend");
                 ImGui::TextWrapped("SFML - Sound library for Windows and Linux");
-                ImGui::TextWrapped("SDL2 - Sound library for the Switch");
+                ImGui::TextWrapped("SDL2 - Sound library for the Switch and Emscripten");
+                ImGui::TextWrapped("emscripten - made this possible on the web");
                 ImGui::TextWrapped("Probably various other things I forgot");
             }
 
@@ -1306,6 +1443,10 @@ bool retrogames::mainmenu_t::run(bool should_render, bool& reset_video_mode)
 
     ImGui::GetBackgroundDrawList()->AddText(ImVec2((resolution_area.width - indent_width * 2.f) - ImGui::CalcTextSize(fps_text).x, static_cast<float>(resolution_area.height) - indent_height * .5f - ImGui::GetFontSize() * .5f), ImGui::GetColorU32({1.f,1.f,1.f,1.f}), fps_text);
     ImGui::PopFont();
+
+    //auto tex = textures->get(textures_e::TEXTURE_SPACE_INVADERS_SHIP);
+
+    //ImGui::GetForegroundDrawList()->AddImage(tex->texture, {100.f,100.f}, {100+tex->width/4,100+tex->height/4}, {0.f,0.f},{1.f,1.f}/*,ImGuiUser::color_to_imgui_color_u32(color_t(255, 0, 0))*/);
 
     return should_exit;
 }

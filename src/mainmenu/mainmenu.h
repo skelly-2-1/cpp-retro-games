@@ -10,7 +10,6 @@
 
 typedef int ImGuiKey;
 
-#include <deque>
 #include <memory>
 #include "games/manager.h"
 #include "imgui/imgui.h"

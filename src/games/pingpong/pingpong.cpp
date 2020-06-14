@@ -153,10 +153,10 @@ bool retrogames::games::pingpong_t::draw(bool render)
             {
                 paddle_hit = true;
 
-                // Revert the x direction
+                // revert the x direction
                 ball->speed_x *= -1.;
 
-                // Add a spin to it if our paddle is moving
+                // add a spin to it if our paddle is moving
                 auto paddle = (ball->speed_x < 0.) ? right_paddle.get() : left_paddle.get();
 
                 if (paddle->direction != paddle_t::DIRECTION::DIRECTION_NONE)
@@ -167,7 +167,7 @@ bool retrogames::games::pingpong_t::draw(bool render)
                     ball_y = std::max(ball_y, paddle->y);
                     ball_y = std::min(ball_y, paddle->y + static_cast<double>(paddle->size.height));
 
-                    // (?) Do we want abs here?
+                    // (?) do we want abs here?
                     auto mult = 1. + std::abs((ball_y - (paddle->y + static_cast<double>(paddle->size.height) * .5)) / (static_cast<double>(paddle->size.height) * .5));
 
                     ball->speed_y = paddle->speed * mult;
@@ -437,7 +437,7 @@ bool retrogames::games::pingpong_t::draw(bool render)
                 auto scored_paddle = is_left ? left_paddle.get() : right_paddle.get();
                 auto max_score = cfgvalue_max_score.get<uint32_t>();
 
-                if (max_score > 0u && scored_paddle->points >= max_score)  winner_paddle = scored_paddle;
+                if (max_score > 0u && scored_paddle->points >= max_score) winner_paddle = scored_paddle;
             }
         }
     }

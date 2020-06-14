@@ -39,3 +39,9 @@
 // The UI will be scaled by this multiplier on Windows and Linux
 #define UI_SCALE 1.f
 #endif
+
+#ifdef PLATFORM_EMSCRIPTEN
+// Define the desired framebuffer resolution (here we set it to 720p).
+#define FB_WIDTH  1280
+#define FB_HEIGHT 720
+#endif

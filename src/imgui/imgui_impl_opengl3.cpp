@@ -1,4 +1,4 @@
-#if defined(PLATFORM_LINUX) || defined(PLATFORM_NS)
+#if defined(PLATFORM_LINUX) || defined(PLATFORM_NS) || defined(PLATFORM_EMSCRIPTEN)
 // dear imgui: Renderer for modern OpenGL with shaders / programmatic pipeline
 // - Desktop GL: 2.x 3.x 4.x
 // - Embedded GL: ES 2.0 (WebGL 1.0), ES 3.0 (WebGL 2.0)
@@ -66,7 +66,7 @@
 
 #include "imgui_impl_opengl3.h"
 
-#if (defined(PLATFORM_NS) && !defined(NS_IMGUI_SOFTWARE_RENDERING)) || defined(PLATFORM_LINUX)
+#if (defined(PLATFORM_NS) && !defined(NS_IMGUI_SOFTWARE_RENDERING)) || defined(PLATFORM_LINUX) || defined(PLATFORM_EMSCRIPTEN)
 #if defined(PLATFORM_NS) && defined(NS_ENABLE_NXLINK)
 #include "misc/trace.h"
 #endif

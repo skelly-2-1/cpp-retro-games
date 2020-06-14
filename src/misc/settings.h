@@ -42,9 +42,13 @@
 #define SETTINGS_STR(x) SETTINGS_STRINGIZE(x)
 #define SETTINGS_ABORT() { MessageBoxA(nullptr, (std::string("Settings manager encountered an error at line ") + SETTINGS_STR(__LINE__) + " in file: " + SETTINGS_STR(__FILE__)).c_str(), "error", MB_SETFOREGROUND | MB_ICONERROR); TerminateProcess(GetCurrentProcess(), 0); }
 #else
+#ifndef PLATFORM_EMSCRIPTEN
 #define SETTINGS_STRINGIZE(x) #x
 #define SETTINGS_STR(x) SETTINGS_STRINGIZE(x)
 #define SETTINGS_ABORT() { fprintf(stderr, (std::string("Settings manager encountered an error at line ") + SETTINGS_STR(__LINE__) + " in file: " + SETTINGS_STR(__FILE__) + "\n").c_str()); std::abort(); }
+#else
+#define SETTINGS_ABORT() std::abort()
+#endif
 #endif
 #else
 #define SETTINGS_ABORT() std::abort()
@@ -145,7 +149,7 @@ namespace retrogames
 			catch (...) {}
 #endif
 
-#ifndef PLATFORM_NS
+#if !defined(PLATFORM_NS) && !defined(PLATFORM_EMSCRIPTEN)
 			main_settings.vsync = &create("main_vsync", false);
 			main_settings.fullscreen = &create("main_fullscreen", false);
 			main_settings.resolution = &create("main_resolution", "1280x720");

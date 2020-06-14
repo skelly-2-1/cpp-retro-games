@@ -62,7 +62,7 @@ namespace retrogames
         {
             auto& main_settings = settings->get_main_settings();
 
-#if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)   
+#if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
             // create game-specific video settings
             settings->create(name + "_video_fps", main_settings.fps->get<uint32_t>());
             settings->create(name + "_video_fullscreen", main_settings.fullscreen->get<bool>());

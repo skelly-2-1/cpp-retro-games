@@ -71,7 +71,9 @@ Index of this file:
 #define FLT_MIN std::numeric_limits<float>::min()
 #endif
 
+#ifndef PLATFORM_EMSCRIPTEN
 using size_t = uint64_t;
+#endif
 
 // Version
 // (Integer encoded as XYYZZ for use in #if preprocessor conditionals. Work in progress versions typically starts at XYY99 then bounce up to XYY00, XYY01 etc. when release tagging happens)

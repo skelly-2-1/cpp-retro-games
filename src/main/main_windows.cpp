@@ -20,6 +20,7 @@
 #include "main.h"
 #include "util/util.h"
 #include "snd/snd.h"
+//#include "textures/textures.h"
 
 namespace retrogames
 {
@@ -27,7 +28,10 @@ namespace retrogames
 	// see snd/snd.h
 	snd_t* snd = nullptr;
 
-    // Needs to be global because of @window_procedure below otherwise not having access to it
+	// see textures/textures.h
+	//textures_t* textures = nullptr;
+
+    // needs to be global because of @window_procedure below otherwise not having access to it
 	std::unique_ptr<imgui_wrapper_dx_t> imgui = nullptr;
 
 	bool imgui_initialized = false;
@@ -88,7 +92,7 @@ static auto to_imgui_key = [](WPARAM wparam) -> ImGuiKey
 */
 LRESULT CALLBACK retrogames::window_procedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	// Post a quit message if we receive WM_DESTROY
+	// post a quit message if we receive WM_DESTROY
 	if (msg == WM_DESTROY)
 	{
 		if (!resetting_video_mode)
@@ -103,14 +107,14 @@ LRESULT CALLBACK retrogames::window_procedure(HWND hwnd, UINT msg, WPARAM wparam
 		return 0;
 	}
 
-	// Let ImGui handle window messages if it's initialized
+	// let ImGui handle window messages if it's initialized
 	if (imgui_initialized && imgui->handle_message(hwnd, msg, wparam, lparam)) return 1;
 
 	switch (msg)
 	{
 		case WM_SYSCOMMAND:
 		{
-			if ((wparam & 0xfff0) == SC_KEYMENU) return 0; // Disable ALT application menu
+			if ((wparam & 0xfff0) == SC_KEYMENU) return 0; // disable ALT application menu
 
 			break;
 		}
@@ -131,7 +135,7 @@ LRESULT CALLBACK retrogames::window_procedure(HWND hwnd, UINT msg, WPARAM wparam
 		}
 	}
 
-	// Call the Windows message handler
+	// call the Windows message handler
 	return DefWindowProcA(hwnd, msg, wparam, lparam);
 }
 
@@ -154,7 +158,7 @@ INT WINAPI WinMain(HINSTANCE,HINSTANCE,char*,int)
 */
 void retrogames::main(void)
 {
-	// Create and load our settings
+	// create and load our settings
 	settings_t settings("settings.json");
 
 	auto& main_settings = settings.get_main_settings();
@@ -171,18 +175,18 @@ void retrogames::main(void)
 
 	snd = &_snd;
 
-	// Grab the wanted resolution from our settings
+	// grab the wanted resolution from our settings
 	auto resolution = main_settings.resolution_area;
 
-	// Grab the main settings
+	// grab the main settings
 	auto vsync = main_settings.vsync->get<bool>();
 	auto fullscreen = main_settings.fullscreen->get<bool>();
 	auto fps = main_settings.fps->get<uint32_t>();
 
-	// Initialize the imgui object
+	// initialize the imgui object
 	imgui = std::make_unique<imgui_wrapper_dx_t>(&settings, "cpp-retro-games", resolution, vsync, fullscreen);
 
-	// Attempt to initialize DirectX
+	// attempt to initialize DirectX
 	std::string error;
 
 	if (!imgui->initialize(true, &error, window_procedure))
@@ -192,7 +196,7 @@ void retrogames::main(void)
 		return;
 	}
 
-	// Attempt to initialize ImGui
+	// attempt to initialize ImGui
 	if (!imgui->initialize(false, &error))
 	{
 		MessageBoxA(nullptr, (std::string("Failed to initialize DirectX. Terminating process.\n\nError: ") + error).c_str(), "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
@@ -200,31 +204,43 @@ void retrogames::main(void)
 		return;
 	}
 
-	// Retrieve the window for own use
+	// initialize our textures
+	/*textures_t _textures;
+
+	if (!_textures.initialize())
+	{
+		MessageBoxA(nullptr, "Failed to initialize textures", "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
+
+		return;
+	}
+
+	textures = &_textures;*/
+
+	// retrieve the window for own use
 	auto window = imgui->get_window();
 
-	// Tell our window that imgui has been initialized
+	// tell our window that imgui has been initialized
 	imgui_initialized = true;
 
-    // Create the fpsmanager object (if vsync is disabled)
+    // create the fpsmanager object (if vsync is disabled)
 	std::unique_ptr<fpsmanager_t> fpsmanager;
 
 	static bool vsync_enabled = vsync;
 
 	if (!vsync_enabled) fpsmanager = std::make_unique<fpsmanager_t>(static_cast<uint16_t>(fps));
 
-	// Call the main initialize function
+	// call the main initialize function
 	main_initialize(&settings);
 
-	// This will be true if we changed video settings
+	// this will be true if we changed video settings
 	bool reset_video_settings = false;
 
-	// Start our main loop
+	// start our main loop
 	MSG msg{};
 
 	while (msg.message != WM_QUIT)
 	{
-		// Listen for messages, and if there are any, handle them (without continuing our main task)
+		// listen for messages, and if there are any, handle them (without continuing our main task)
 		if (PeekMessageA(&msg, NULL, 0U, 0U, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
@@ -233,23 +249,23 @@ void retrogames::main(void)
 			continue;
 		}
 
-		// Begin the frame
+		// begin the frame
 		auto render = imgui->begin_frame();
 
-		// Draw
+		// draw
 		auto should_render = render && window->is_in_foreground();
 		auto should_exit = main_frame(should_render, reset_video_settings);
 
-		// End the frame
+		// end the frame
 		imgui->end_frame(should_render, color_t(40, 40, 40));
 
-		// Exit if we should (if main_frame returns true)
+		// exit if we should (if main_frame returns true)
 		if (should_exit) break;
 
-		// Limit our FPS
+		// limit our FPS
 		if (!vsync_enabled) fpsmanager->run();
 
-		// Reset video mode if we should
+		// reset video mode if we should
 		if (reset_video_settings)
 		{
 			reset_video_settings = false;
@@ -264,10 +280,18 @@ void retrogames::main(void)
 
 			window = imgui->get_window();
 
-			// Tell anything else that the video mode changed
+			/*// re-create textures
+			if (!textures->reinitialize())
+			{
+				MessageBoxA(nullptr, "Failed to reinitialize textures", "cpp-retro-games", MB_ICONERROR | MB_SETFOREGROUND);
+
+				return;
+			}*/
+
+			// tell anything else that the video mode changed
 			main_reset();
 
-			// Reset the FPS manager
+			// reset the FPS manager
 			auto old_vsync_enabled = vsync_enabled;
 			
 			vsync_enabled = settings.get_main_settings().vsync->get<bool>();
@@ -287,10 +311,10 @@ void retrogames::main(void)
 		}
 	}
 
-	// Thread finished, shut down ImGui and DirectX
+	// thread finished, shut down ImGui and DirectX
 	imgui->shutdown();
 
-	// Save our settings
+	// save our settings
 	settings.save();
 }
 #endif

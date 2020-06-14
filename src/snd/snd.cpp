@@ -15,6 +15,10 @@
 #else
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
+
+#ifdef PLATFORM_EMSCRIPTEN
+#include <emscripten.h>
+#endif
 #endif
 
 // all our sounds
@@ -75,12 +79,27 @@ bool retrogames::snd_t::initialize(void)
         return true;
     };
 #else
+
+#ifndef PLATFORM_EMSCRIPTEN
     // init SDL2 audio
     SDL_Init(SDL_INIT_AUDIO);
+#endif
+
+#ifdef PLATFORM_EMSCRIPTEN
+    int const frequency = EM_ASM_INT({
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        var ctx = new AudioContext();
+        var sr = ctx.sampleRate;
+        ctx.close();
+        return sr;
+    });
+#else
+    int const frequency = 44100;
+#endif
 
     // open 44.1KHz, signed 16bit, system byte order,
     // stereo audio, using 4096 byte chunks
-    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 4096);
+    if (Mix_OpenAudio(frequency, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 4096) != 0) return false;
 
     auto add_sound = [this, &decompress](sounds_e sound, const uint32_t size, const uint32_t* data) -> bool
     {

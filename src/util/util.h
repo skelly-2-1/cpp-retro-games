@@ -13,8 +13,13 @@
 #include <vector>
 #include <cstdint>
 #include <string>
-#include <random>
 #include "misc/area_size.h"
+
+#ifndef PLATFORM_EMSCRIPTEN
+#include <random>
+#else
+#include <stdlib.h>
+#endif
 
 namespace retrogames
 {
@@ -60,12 +65,16 @@ namespace retrogames
 		template <typename T>
 		T random(T min, T max)
 		{
+#ifndef PLATFORM_EMSCRIPTEN
 			using dist_type = typename std::conditional<std::is_integral<T>::value, std::uniform_int_distribution<T>, std::uniform_real_distribution<T>>::type;
 
 			thread_local static std::mt19937 gen(std::random_device{}());
     		thread_local static dist_type dist;
 
 			return dist(gen, typename dist_type::param_type{min, max});
+#else
+			return min + (T)rand()/((T)RAND_MAX/(T)(max-min));
+#endif
 		}
 
 	}

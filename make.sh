@@ -11,6 +11,10 @@ elif grep -q PLATFORM_LINUX .vscode/c_cpp_properties.json
 then
     echo "Compiling for PLATFORM_LINUX"
     make
+elif grep -q PLATFORM_EMSCRIPTEN .vscode/c_cpp_properties.json
+then
+    echo "Compiling for PLATFORM_EMSCRIPTEN"
+    make emscripten
 else
     # code if not found
     echo "Platform not found in .vscode/c_cpp_properties.json, aborting..."

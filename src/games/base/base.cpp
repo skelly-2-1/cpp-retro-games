@@ -67,7 +67,7 @@ bool retrogames::game_base_t::draw_pause_menu(ImFont* font)
 
             auto button_size = ImVec2{((ImGui::CalcTextSize("Are you sure?").x+ImGui::GetStyle().FramePadding.x*2.f)*.5f)-ImGui::GetStyle().ItemInnerSpacing.x*2.f,0.f};
 
-            if (ImGui::Button("Yes", button_size)) result = true;
+            if (ImGui::Button("Yes", button_size)) { confirming_main_menu = false; result = true; }
 
             ImGui::SameLine();
 

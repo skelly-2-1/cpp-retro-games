@@ -111,40 +111,92 @@ ifneq "$(findstring ns, $(MAKECMDGOALS))" ""
 
     export PATH	:= $(DEVKITPATH)/tools/bin:$(DEVKITPATH)/devkitA64/bin:$(PATH)
 else
-    ifeq ($(detected_OS),Windows)
-		# Windows, tell the compiler which platform we're on
-        CXXFLAGS += -DPLATFORM_WINDOWS
+    # check if we're targeting emscripten
+    ifneq "$(findstring emscripten, $(MAKECMDGOALS))" ""
+        ##---------------------------------------------------------------------
+        ## EMSCRIPTEN OPTIONS
+        ##---------------------------------------------------------------------
 
-		# check if the DirectX SDK is installed
-        ifeq ($(strip $(DXSDK_DIR)),)
-            $(error "Failed to find a valid DirectX SDK installation. Please set DXSDK_DIR in PATH")
+        EMS += -s USE_SDL=2 -s WASM=1 -s USE_SDL_MIXER=2
+        EMS += -s ALLOW_MEMORY_GROWTH=1
+        EMS += -s DISABLE_EXCEPTION_CATCHING=1 -s NO_EXIT_RUNTIME=0
+        EMS += -s ASSERTIONS=1
+
+        # Uncomment next line to fix possible rendering bugs with Emscripten version older then 1.39.0 (https://github.com/ocornut/imgui/issues/2877)
+        #EMS += -s BINARYEN_TRAP_MODE=clamp
+        #EMS += -s SAFE_HEAP=1    ## Adds overhead
+
+        # Emscripten allows preloading a file or folder to be accessible at runtime.
+        # The Makefile for this example project suggests embedding the misc/fonts/ folder into our application, it will then be accessible as "/fonts"
+        # See documentation for more details: https://emscripten.org/docs/porting/files/packaging_files.html
+        # (Default value is 0. Set to 1 to enable file-system and include the misc/fonts/ folder as part of the build.)
+        USE_FILE_SYSTEM ?= 1
+
+        ifeq ($(USE_FILE_SYSTEM), 0)
+            EMS += -s NO_FILESYSTEM=1 -DIMGUI_DISABLE_FILE_FUNCTIONS
+        endif
+
+        ifeq ($(USE_FILE_SYSTEM), 1)
+        #    LDFLAGS += --no-heap-copy --preload-file ../../misc/fonts@/fonts
+            LDFLAGS += --no-heap-copy -lidbfs.js
+            EMS += -DIMGUI_DISABLE_FILE_FUNCTIONS
+        endif
+
+        # use the emscripten compiler
+        CXX = em++
+
+        # tell the compiler which platform we're on
+        CXXFLAGS += -DPLATFORM_EMSCRIPTEN $(EMS) -Wformat -Os
+
+        LDLIBS += $(EMS)
+        #LDFLAGS += --shell-file shell_minimal.html
+
+        # run emsdk_env.bat on Windows (requires EMSDK to be set persistently)
+        ifeq ($(detected_OS),Windows)
+            ifeq ($(strip $(EMSDK)),)
+				$(error "Please set EMSDK in your environment. export EMSDK=<path to>/emsdk")
+	        endif
 		endif
 
-		# include the DirectX SDK
-        INCLUDES += -I"$(DXSDK_DIR)Include"
+		# change platform name (we don't want to compile for Windows or Linux anymore)
+		# since we ran 'make emscripten'
+        PLATFORM_NAME := emscripten
+    else
+        ifeq ($(detected_OS),Windows)
+		    # Windows, tell the compiler which platform we're on
+            CXXFLAGS += -DPLATFORM_WINDOWS
 
-		# tell the compiler where to include libraries for DirectX
-        LDPATHS += -L"$(DXSDK_DIR)Lib\x64"
+		    # check if the DirectX SDK is installed
+            ifeq ($(strip $(DXSDK_DIR)),)
+                $(error "Failed to find a valid DirectX SDK installation. Please set DXSDK_DIR in PATH")
+		    endif
 
-		# include directx, gdi32 and xinput (xinput is optional: see note 2 at the top of this file)
-        LDLIBS += -ld3d9 -ld3dx9 -lxinput -lgdi32
+		    # include the DirectX SDK
+            INCLUDES += -I"$(DXSDK_DIR)Include"
 
-		# add .exe to the output name
-        OUTPUT_NAME := $(OUTPUT_NAME).exe
+		    # tell the compiler where to include libraries for DirectX
+            LDPATHS += -L"$(DXSDK_DIR)Lib\x64"
 
-		# stop the console from coming up in windows
-        LDFLAGS += -mwindows
+		    # include directx, gdi32 and xinput (xinput is optional: see note 2 at the top of this file)
+            LDLIBS += -ld3d9 -ld3dx9 -lxinput -lgdi32
+
+		    # add .exe to the output name
+            OUTPUT_NAME := $(OUTPUT_NAME).exe
+
+		    # stop the console from coming up in windows
+            LDFLAGS += -mwindows
+	    endif
+
+        ifeq ($(detected_OS),Linux)
+            CXXFLAGS += -DPLATFORM_LINUX
+
+		    # include necessary libraries (opengl, glfw, etc.)
+            LDLIBS += -lGL -lGLEW -lglfw3 -ldl -lX11 -lpthread
+	    endif
+
+	    # include SFML audio library (for both; windows and linux)
+        LDLIBS += -lsfml-audio
 	endif
-
-    ifeq ($(detected_OS),Linux)
-        CXXFLAGS += -DPLATFORM_LINUX
-
-		# include necessary libraries (opengl, glfw, etc.)
-        LDLIBS += -lGL -lGLEW -lglfw3 -ldl -lX11 -lpthread
-	endif
-
-	# include SFML audio library
-    LDLIBS += -lsfml-audio
 endif
 
 # set our target
@@ -168,6 +220,15 @@ $(TARGET): $(OBJ_FILES)
 	@echo built ... $(TARGET)
 	@cp -r dep/$(PLATFORM_NAME)/* $(BUILD_DIR)/$(PLATFORM_NAME)
 
+# final build of emscripten
+$(TARGET).html: $(OBJ_FILES)
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)/$(PLATFORM_NAME)
+	@echo building ... $(TARGET).html
+	@$(CXX) $(LDFLAGS) $(OBJ_FILES) $(LDPATHS) $(LDLIBS) -o $@
+	@echo built ... $(TARGET).html
+	@cp -r dep/$(PLATFORM_NAME)/* $(BUILD_DIR)/$(PLATFORM_NAME)
+
 # object files (ns)
 $(OBJ_DIR)/ns/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
@@ -186,11 +247,40 @@ $(OBJ_DIR)/linux/%.o: $(SRC_DIR)/%.cpp
 	@echo $(notdir $<)
 	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c -o $@ $< $(ERROR_FILTER)
 
+# object files (emscripten)
+$(OBJ_DIR)/emscripten/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)
+	@echo $(notdir $<)
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c -o $@ $< $(ERROR_FILTER)
+
 # 'make ns' option will call this, which will build the object
 # files like normal and call the target .elf and .nro
 .PHONY: ns
 .SILENT: ns
 ns: $(OBJ_FILES) $(TARGET).elf $(TARGET).nro
+
+# 'make emscripten' option will call this
+.PHONY: emscripten
+.SILENT: emscripten
+emscripten: setup_emscripten $(OBJ_FILES) $(TARGET).html
+
+.SILENT: setup_emscripten
+.PHONY: setup_emscripten
+setup_emscripten:
+	{ \
+		set -e ;\
+		SRC="$$BASH_SOURCE" ;\
+		if [ "$$SRC" = "" ]; then\
+			SRC="$$0" ;\
+		fi ;\
+		CURDIR="$$(pwd)" ;\
+		cd "$$(dirname "$$SRC")" ;\
+		unset SRC ;\
+		tmpfile=`mktemp` || exit 1 ;\
+		EMSDK_BASH=1 $(EMSDK)/./emsdk construct_env $$tmpfile ;\
+		. $$tmpfile ;\
+		rm -f $$tmpfile ;\
+    }
 
 # clean: simply remove the whole obj and bin/build directory
 .PHONY: clean
