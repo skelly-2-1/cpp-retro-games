@@ -1,5 +1,5 @@
 # cpp-retro-games
-Retro games made by Steven Kelly in C++. Supports Windows, Linux, Emscripten (web) and the Nintendo Switch.
+Retro games made in C++. Supports Windows, Linux, Emscripten (web) and the Nintendo Switch.
 
 # Web version
 * The web version is available at https://skelly-2-1.github.io/cpp-retro-games/cpp-retro-games.html for you to try out
